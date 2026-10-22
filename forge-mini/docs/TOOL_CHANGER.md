@@ -21,24 +21,26 @@ Wrist axis to coupler face: **22 mm**. Coupler mass on the arm: about 10 g plus 
 | Tool | ID resistor |
 |---|---|
 | gripper (A and B) | 1 kΩ |
+| tweezers | 1.5 kΩ |
 | vacuum | 2.2 kΩ |
 | pen | 3.3 kΩ |
 | probe | 4.7 kΩ in series with a normally-closed switch (a touch reads as open) |
 | clamp | 6.8 kΩ |
 | spindle | 10 kΩ |
 | glue | 15 kΩ |
+| soldering iron | 22 kΩ |
 | nothing | open |
 
 After every pick-up the executor reads the ID and stops the run if it doesn't match. After every drop-off it checks that the line reads open.
 
 ## Tool racks
 
-Each rack is a shelf 40 mm above the plate with four holes. A tool hangs through its hole by its coupler plate, like a reamer in a stand. Neighbouring arms share a rack:
+Each rack is a shelf 40 mm above the plate with five holes, 18 mm apart. A tool hangs through its hole by its coupler plate, like a reamer in a stand. Neighbouring arms share a rack:
 
 | Rack | Arms | Slots (x, y) | Tools |
 |---|---|---|---|
-| left (rack_L) | arm1, arm3 | (−104, ±30), (−104, ±10) | gripper_A, vacuum, pen, probe |
-| right (rack_R) | arm2, arm4 | (104, ±30), (104, ±10) | gripper_B, clamp, spindle, glue |
+| left (rack_L) | arm1, arm3 | (−100, 36 / 18 / 0 / −18 / −36) | gripper_A, tweezers, vacuum, pen, probe |
+| right (rack_R) | arm2, arm4 | (100, 36 / 18 / 0 / −18 / −36) | gripper_B, clamp, spindle, iron, glue |
 
 The slot positions are not arbitrary. They are the area where both neighbouring arms can reach every slot with every tool. Their base servos must stay within ±90°, and their wrists must stay within ±90° while lifting a 48 mm tool out of its hole. The test `test_every_tool_slot_reachable_by_both_neighbours` checks this.
 
@@ -49,7 +51,7 @@ Each rack is a shared zone with capacity 1, so two arms never reach into the sam
 
 ## Bit block (arm2, arm4)
 
-A 16 mm wide block beside the right rack. Bits stand shank-up in holes, with a stripper bar just above their collars.
+A 16 mm wide block just inside the right rack (x = 76). Bits stand shank-up in holes, with a stripper bar just above their collars.
 
 | Bit | Use | Stick-out |
 |---|---|---|
@@ -60,6 +62,10 @@ A 16 mm wide block beside the right rack. Bits stand shank-up in holes, with a s
 | hex_1_5 | drive M2 socket screws | 14 mm |
 
 The spindle's collet is a magnet with a V-notch. **Pick:** lower the spindle onto the shank, and the magnet grabs it. **Return:** lower the bit into its hole, slide 12 mm sideways under the stripper bar (which pulls it off the magnet), then lift.
+
+## Soldering iron
+
+A USB-C mini iron (Pinecil-class, about 30 g with tip) on a coupler plate. Its power comes through its own thin silicone cable on a service loop, not through the pogo pins. The SIG line drives a small board in the tool: `off` (0), `heat` (60, heater on) and `feed` (150, heater on and the N20 feeder pushes solder wire). The `solder` action touches the pad, preheats 0.8 s, feeds for 0.4 s, lets the joint flow for 0.3 s and lifts. If the Pi goes quiet, the ESP32 watchdog drops SIG to 0, which turns the heater off.
 
 ## Why reaming works on a small servo arm
 

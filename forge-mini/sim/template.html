@@ -25,6 +25,10 @@
   --toolbody: #d9dee3;
   --ink-pen: #1d4ed8;
   --part: #f0c34a;
+  --pcb: #2f7d4f;
+  --oled: #1b2a4a;
+  --eye: #5fd8ff;
+  --prop: #f08a24;
   --arm1: #d98324;
   --arm2: #2f7dc0;
   --arm3: #7a5bc6;
@@ -43,7 +47,7 @@
     --bg: #10151b; --surface: #171f28; --sunken: #0c1116; --ink: #e3e9ef; --muted: #95a2af; --line: #2a3541;
     --accent: #f0763c; --accent-ink: #160c06; --ok: #4cc28a; --bad: #f06a5e;
     --scene: #0d1217; --board: #26303b; --plate: #364350; --metal: #6c7884; --steel: #8d99a5; --servo: #11171d;
-    --toolbody: #4a5663; --ink-pen: #6ea0ff; --part: #e0b13a;
+    --toolbody: #4a5663; --ink-pen: #6ea0ff; --part: #e0b13a; --pcb: #3f9a63; --oled: #24375e; --eye: #7fe3ff; --prop: #f59a3c;
     --arm1: #f0a04a; --arm2: #5aa6e8; --arm3: #a58af0; --arm4: #45c4b4;
     color-scheme: dark;
   }
@@ -75,7 +79,8 @@ header .lede { max-width: 64ch; color: var(--muted); margin-top: 8px; }
 .spec { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: var(--step--1); color: var(--muted); }
 .spec b { color: var(--ink); font-weight: 500; }
 
-.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.tab.proj .wk { color: var(--ok); }
 .tab {
   font: inherit; text-align: left; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
   border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0;
@@ -98,6 +103,7 @@ header .lede { max-width: 64ch; color: var(--muted); margin-top: 8px; }
 .chip.ok { border-color: var(--ok); color: var(--ok); }
 .chip.bad { border-color: var(--bad); color: var(--bad); }
 .chip.live { border-color: var(--accent); color: var(--accent); }
+.chip.idle { opacity: 0.5; border-style: dashed; }
 .steplabel {
   position: absolute; left: 12px; right: 12px; bottom: 64px; pointer-events: none;
   font-family: var(--font-display); font-stretch: 105%; font-weight: 700; font-size: var(--step-1); color: var(--ink);
@@ -146,6 +152,19 @@ pre {
 .msg.tool code { white-space: pre-wrap; word-break: break-word; }
 .msg .res-bad { color: var(--bad); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; }
 .msg .res-ok { color: var(--ok); font-family: var(--font-mono); font-size: 12px; }
+.sched { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.sched .head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: end; }
+.sched .big { font-family: var(--font-display); font-stretch: 110%; font-weight: 800; font-size: var(--step-2); font-variant-numeric: tabular-nums; }
+.sched .vs { font-size: var(--step--1); color: var(--muted); }
+.sched .vs b { color: var(--ok); }
+.util { display: grid; grid-template-columns: 3.6em minmax(0, 1fr) 2.8em; gap: 5px 8px; align-items: center; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.util .track { height: 9px; background: var(--sunken); border-radius: 3px; position: relative; overflow: hidden; }
+.util .track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+.util span:last-child { text-align: right; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { font: inherit; font-size: var(--step--1); border: 0; background: var(--surface); color: var(--ink); padding: 5px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .flow { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
 .flow td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .flow td:first-child { white-space: nowrap; font-weight: 600; }
@@ -213,14 +232,14 @@ td.num { font-family: var(--font-mono); text-align: right; }
     <div>
       <div class="eyebrow">Prototype · 4 servo arms · automatic tool changers</div>
       <h1>Forge Mini Build Lab</h1>
-      <p class="lede">Four arms share two tool racks and a reamer and bit block. Every arm can swap its end effector on its own, so one small cell can hold, ream, chamfer, press, probe and mark a part. Each week below plays a real recipe through the planner and inverse kinematics the machine will use.</p>
+      <p class="lede">Four arms share two tool racks and a reamer and bit block. Each arm swaps its own end effector, and the scheduler keeps all four working at once, so one small cell can ream, press, screw, solder, glue, probe and mark. The build weeks and the three projects below each play a real recipe through the planner and inverse kinematics the machine will use.</p>
     </div>
     <div class="spec">
-      <span>Reach <b>152 mm</b></span><span>Tools <b>8</b></span><span>Bits <b>5</b></span><span>Servo channels <b>24</b></span>
+      <span>Reach <b>152 mm</b></span><span>Tools <b>10</b></span><span>Bits <b>5</b></span><span>Servo channels <b>24</b></span>
     </div>
   </header>
 
-  <nav class="tabs" role="tablist" aria-label="Build weeks" id="tabs"></nav>
+  <nav class="tabs" role="tablist" aria-label="Build weeks and projects" id="tabs"></nav>
 
   <section class="bench">
     <div>
@@ -249,8 +268,8 @@ td.num { font-family: var(--font-mono); text-align: right; }
   <section class="sheet" id="tools">
     <div class="sheet-head">
       <div class="eyebrow">Tool set</div>
-      <h2>Eight tools, two racks, one bit block</h2>
-      <p>Tools hang through holes in a raised shelf, like a reamer stand. Neighbouring arms share a rack: arm 1 and arm 3 use the left one, arm 2 and arm 4 the right one. The spindle picks its cutters from the bit block, so the same tool reams, drills, chamfers or drives screws.</p>
+      <h2>Ten tools, two racks, one bit block</h2>
+      <p>Tools hang through holes in a raised shelf, like a reamer stand. Neighbouring arms share a rack: arm 1 and arm 3 use the left one, arm 2 and arm 4 the right one. The spindle picks its cutters from the bit block, so the same tool reams, drills, chamfers or drives screws. The soldering iron is a USB-C mini iron on its own thin cable; the tool signal only drives its solder feeder and switches the heater.</p>
     </div>
     <div class="toolgrid" id="toolgrid"></div>
     <div>
@@ -390,12 +409,14 @@ td.num { font-family: var(--font-mono); text-align: right; }
 <script>
 (() => {
 const DATA = JSON.parse(document.getElementById('forge-data').textContent);
-const CELL = DATA.week3.cell;
+const CELL = DATA.drone.cell;
 const ROLE = { arm1: 'Assembler', arm2: 'Holder', arm3: 'Loader', arm4: 'Machinist' };
 const TOOL_INFO = {
   gripper: 'Two-jaw gripper on its own SG90. Picks parts, pins and plates.',
   vacuum: 'Suction cup with a micro pump. Lifts flat parts from the kit tray.',
   pen: 'Spring-loaded fine liner. Marks parts and draws calibration squares.',
+  tweezers: 'Fine tweezers on a micro servo. Places LEDs, screws and small modules.',
+  iron: 'USB-C mini soldering iron with an N20 solder feeder. Heats, feeds, lets the joint flow.',
   probe: 'Touch probe with a normally-closed switch. Measures heights to ±0.1 mm.',
   clamp: 'Rubber pad. Holds the part down while others work on it.',
   spindle: 'N20 motor at 1000 rpm with a magnetic V-collet. Takes bits from the bit block.',
@@ -405,7 +426,7 @@ const BIT_INFO = { reamer: 'finishes a pilot hole to exact size', drill: 'drills
 
 const STAGES = [
   {
-    id: 'week1', wk: 'Week 1', name: 'One arm, first tool changes', data: DATA.week1, show: { arms: ['arm1'], racks: ['rack_L'], bits: false, trays: false, pads: true },
+    id: 'week1', wk: 'Week 1', name: 'One arm, first tool changes', data: DATA.week1, seq: DATA.week1_seq, show: { arms: ['arm1'], racks: ['rack_L'], bits: false, trays: false, pads: true },
     html: () => `
       <div><div class="eyebrow">Week 1 of 4</div><h2>One arm, first tool changes</h2></div>
       <p class="goal">Prove that one arm goes where the code says, and that the coupler locks, reports and releases a tool every time.</p>
@@ -425,7 +446,7 @@ const STAGES = [
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
   {
-    id: 'week2', wk: 'Week 2', name: 'Four arms, two racks', data: DATA.week2, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: false, pads: true },
+    id: 'week2', wk: 'Week 2', name: 'Four arms, two racks', data: DATA.week2, seq: DATA.week2_seq, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: false, pads: true },
     html: () => `
       <div><div class="eyebrow">Week 2 of 4</div><h2>Four arms, two racks</h2></div>
       <p class="goal">Four arms change tools and share the plate without ever touching.</p>
@@ -434,14 +455,14 @@ const STAGES = [
         <li>Right rack with gripper, clamp, spindle and glue.</li>
         <li>Bit block with the 2.0 and 3.0 mm reamers, a 1.5 mm drill, a 90° countersink and a 1.5 mm hex bit.</li>
       </ul></div>
-      <div><h4>The rules that prevent crashes</h4><p>The plate has shared zones. Each rack and each tray admits one arm at a time, and the fixture admits two. The planner rejects any recipe that breaks a zone before a servo moves. This is its real answer when arm 1 and arm 3 both reach into the left rack:</p></div>
+      <div><h4>The rules that prevent crashes</h4><p>The plate has shared zones. Each rack and each tray admits one arm at a time, the fixture three, and every pair of tools stays 20 mm apart. The scheduler waits until there is room. A recipe forced to run exactly as written (<code>schedule: sequential</code>) is rejected before a servo moves. This is the real answer when arm 1 and arm 3 both reach into the left rack:</p></div>
       <pre class="err">${esc(DATA.conflict_error)}</pre>
       <div><h4>In the simulation</h4><p>All four arms calibrate together, then tool up in pairs (one per rack). Arm 4 loads a drill from the bit block, arm 3 probes the block, and arm 1 moves it.</p></div>
       <div class="done"><b>Done when</b> this recipe runs 5 times with no contact and every tool ends back in its slot.</div>
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
   {
-    id: 'week3', wk: 'Week 3', name: 'First product', data: DATA.week3, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
+    id: 'week3', wk: 'Week 3', name: 'First product', data: DATA.week3, seq: DATA.week3_seq, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
     html: () => `
       <div><div class="eyebrow">Week 3 of 4</div><h2>First product: doweled bracket</h2></div>
       <p class="goal">Put a printed plate in the kit tray and two 2 mm dowel pins in the cup. The cell finishes the part and puts it in the finished tray.</p>
@@ -457,7 +478,7 @@ const STAGES = [
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
   {
-    id: 'week4', wk: 'Week 4', name: 'Claude takes the controls', data: DATA.week3, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
+    id: 'week4', wk: 'Week 4', name: 'Claude takes the controls', data: DATA.week3, seq: DATA.week3_seq, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
     html: () => `
       <div><div class="eyebrow">Week 4 of 4</div><h2>Claude takes the controls</h2></div>
       <p class="goal">Connect the machine to Claude through MCP. Claude writes the recipe, picks the tools, the planner checks it, you approve, the arms build.</p>
@@ -478,6 +499,64 @@ const STAGES = [
         <div class="msg tool"><span class="who">Claude → run_recipe</span><code>name: doweled_bracket, confirm: true</code><span class="res-ok">running, playing in the viewport</span></div>
       </div></div>
       <div class="done"><b>Safety rules:</b> Claude only submits recipes. Every recipe is planned first, nothing runs without confirm, every tool change is checked by its ID resistor, and the hardware e-stop cannot be overridden by software.</div>
+      <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
+  },
+  {
+    id: 'drone', wk: 'Project', proj: true, name: 'Micro-drone', data: DATA.drone, seq: DATA.drone_seq, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
+    html: () => `
+      <div><div class="eyebrow">Project</div><h2>Micro-drone</h2></div>
+      <p class="goal">A 65 mm brushed quad, like the 3D-printed Arduino drone, scaled to fit the fixture: printed X-frame, four 6 mm coreless motors, a flight-controller board and four props.</p>
+      <div><h4>You load</h4><ul>
+        <li>Printed frame → kit tray (front). Flight-controller board → side pocket.</li>
+        <li>3 motors → cup A, 3 props → cup B (back); 1 motor and 1 prop → cup C (front).</li>
+      </ul></div>
+      <div><h4>Who does what</h4>
+      <table class="flow"><tbody>
+        <tr><td style="color:var(--arm3)">Arm 3 Loader</td><td>vacuum: frame, board onto its standoffs, motor 4 and prop 4</td></tr>
+        <tr><td style="color:var(--arm1)">Arm 1 Assembler</td><td>gripper: motor 1 and prop 1, then unloads the drone</td></tr>
+        <tr><td style="color:var(--arm2)">Arm 2 Holder</td><td>gripper: motors 2 and 3, props 2 and 3, at the same time as arm 1</td></tr>
+        <tr><td style="color:var(--arm4)">Arm 4 Machinist</td><td>hex bit: 2 board screws → iron: motor leads</td></tr>
+      </tbody></table></div>
+      <div class="done"><b>Watch for</b> three arms pressing motors into three corners at the same moment, while arm 4 is still collecting its screwdriver bit.</div>
+      <p class="note">This recipe solders one lead per motor to keep it short. A real board has two per motor, so add four more pad locations to the recipe.</p>
+      <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
+  },
+  {
+    id: 'bot', wk: 'Project', proj: true, name: 'Desk robot head', data: DATA.bot, seq: DATA.bot_seq, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
+    html: () => `
+      <div><div class="eyebrow">Project</div><h2>Desk robot head</h2></div>
+      <p class="goal">The head of the little Arduino desk robot with an OLED face. The printed shell lies face-up, so every job is done from above.</p>
+      <div><h4>You load</h4><ul>
+        <li>Printed head shell → kit tray. 0.96" OLED module → side pocket.</li>
+        <li>Two M2 screws → cup B.</li>
+      </ul></div>
+      <div><h4>Who does what</h4>
+      <table class="flow"><tbody>
+        <tr><td style="color:var(--arm3)">Arm 3 Loader</td><td>vacuum: shell to fixture, OLED into the face recess</td></tr>
+        <tr><td style="color:var(--arm2)">Arm 2 Holder</td><td>glue: a bead along two edges of the OLED</td></tr>
+        <tr><td style="color:var(--arm1)">Arm 1 Assembler</td><td>tweezers: sets both screws → gripper: unloads the head</td></tr>
+        <tr><td style="color:var(--arm4)">Arm 4 Machinist</td><td>hex bit: drives the screws → iron: VCC, GND, SCL, SDA</td></tr>
+      </tbody></table></div>
+      <div class="done"><b>Next step for the full robot:</b> the body (servo, Nano, battery box) has faces that point sideways. That needs a wrist-roll joint, the first upgrade after the prototype.</div>
+      <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
+  },
+  {
+    id: 'led', wk: 'Project', proj: true, name: 'LED bar, helping hands', data: DATA.led, seq: DATA.led_seq, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
+    html: () => `
+      <div><div class="eyebrow">Project</div><h2>LED bar, soldered like on helping hands</h2></div>
+      <p class="goal">The cell is its own helping-hands station: one arm clamps the board, two arms feed LEDs in from both sides, and the iron follows right behind them.</p>
+      <div><h4>You load</h4><ul>
+        <li>64 × 16 mm PCB → kit tray.</li>
+        <li>Two LEDs → cup A (back), two LEDs → side pocket (front).</li>
+      </ul></div>
+      <div><h4>Who does what</h4>
+      <table class="flow"><tbody>
+        <tr><td style="color:var(--arm2)">Arm 2 Holder</td><td>clamp: holds the left end of the board the whole time</td></tr>
+        <tr><td style="color:var(--arm1)">Arm 1 Assembler</td><td>tweezers: LEDs 1 and 2</td></tr>
+        <tr><td style="color:var(--arm3)">Arm 3 Loader</td><td>vacuum: brings the PCB, then LEDs 3 and 4</td></tr>
+        <tr><td style="color:var(--arm4)">Arm 4 Machinist</td><td>iron: 8 joints, two per LED, as soon as each LED is in</td></tr>
+      </tbody></table></div>
+      <div class="done"><b>Watch for</b> the iron soldering LED 1 while arm 1 is already fetching LED 2: placing and soldering overlap.</div>
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
 ];
@@ -642,6 +721,14 @@ function makeTool(name, t) {
     parts.spin = new THREE.Group(); parts.spin.position.x = 25; g.add(parts.spin);
     parts.spin.add(along(cyl(3.5, len - 25, steel, 12), 0, len - 25));
     parts.spin.add(box(len - 25, 1, 8, steel, (len - 25) / 2, 0, 0));
+  } else if (t.type === 'tweezers') {
+    g.add(along(cyl(5, len - 20, body, 16), 3, len - 20));
+    parts.fingers = [-1, 1].map(s => { const f = box(19, 2, 1.4, steel, len - 9.5, 0, s * 3); g.add(f); return { m: f, s, fine: true }; });
+  } else if (t.type === 'iron') {
+    g.add(along(cyl(6.5, len - 22, mat('--servo'), 16), 3, len - 22));
+    g.add(along(cyl(2.4, 13, steel, 12), len - 19, 13));
+    parts.hot = along(cyl(1.3, 7, mat('--steel', { metalness: 0.4 }), 10, 0.3), len - 7, 7); g.add(parts.hot);
+    const feed = along(cyl(0.7, len - 12, mat('--steel'), 6), 3, len - 12); feed.position.z = 8; g.add(feed);
   } else if (t.type === 'dispenser') {
     g.add(along(cyl(6, len - 14, mat('--plate', { transparent: true, opacity: 0.85 }), 18), 3, len - 14));
     g.add(along(cyl(0.7, 11, steel, 8, 0.5), len - 11, 11));
@@ -667,23 +754,46 @@ for (const [n, b] of Object.entries(CELL.bits)) {
 // ---------- parts ----------
 const ITEM_SPECS = {
   block: { h: 12, make: () => box(14, 12, 14, mat('--accent', { roughness: 0.5 })) },
-  plate: { h: 4, make: () => { const g = new THREE.Group(); g.add(box(44, 4, 24, mat('--part', { roughness: 0.55 }))); return g; } },
+  plate: { h: 4, make: () => box(56, 4, 30, mat('--part', { roughness: 0.55 })) },
   pin:   { h: 10, make: () => cyl(1, 10, mat('--steel', { metalness: 0.7, roughness: 0.25 }), 12) },
+  drone_frame: { h: 4, make: () => { const g = new THREE.Group(), m = mat('--servo', { roughness: 0.7 });
+    g.add(box(24, 4, 24, m));
+    for (const a of [Math.PI / 4, -Math.PI / 4]) { const b = box(66, 3, 6, m, 0, -0.5, 0); b.rotation.y = a; g.add(b); }
+    for (const [x, y] of [[-23, 23], [23, 23], [23, -23], [-23, -23]]) { const r = cyl(5, 4, m, 16); r.position.set(x, 0, -y); g.add(r); }
+    return g; } },
+  motor: { h: 10, make: () => { const g = new THREE.Group(); const c = cyl(3.2, 8, mat('--steel', { metalness: 0.6 }), 14); c.position.y = -1; g.add(c); const sh = cyl(0.5, 2, mat('--servo'), 6); sh.position.y = 4; g.add(sh); return g; } },
+  prop:  { h: 2, make: () => { const g = new THREE.Group(); const b = box(31, 1, 4, mat('--prop', { roughness: 0.5 })); b.rotation.y = 0.5; g.add(b); g.add(cyl(2, 2, mat('--prop'), 12)); return g; } },
+  board: { h: 1.6, make: () => { const g = new THREE.Group(); g.add(box(22, 1.6, 22, mat('--pcb', { roughness: 0.5 }))); g.add(box(7, 1.2, 7, mat('--servo'), 0, 1.2, 0)); return g; } },
+  bot_head: { h: 14, make: () => { const g = new THREE.Group(); g.add(box(36, 14, 36, mat('--plate', { roughness: 0.6 }))); g.add(box(29, 0.6, 26, mat('--servo'), 0, 6.9, 3)); return g; } },
+  oled:  { h: 2, make: () => { const g = new THREE.Group(); g.add(box(27, 2, 27, mat('--oled', { roughness: 0.4 })));
+    g.add(box(23, 0.4, 13, basic('--servo'), 0, 1.1, -1));
+    for (const x of [-5, 5]) g.add(box(4, 0.3, 2.4, basic('--eye'), x, 1.35, -2));
+    g.add(box(5, 0.3, 0.8, basic('--eye'), 0, 1.35, 2.5)); return g; } },
+  screw: { h: 6, make: () => { const g = new THREE.Group(); const sh = cyl(1, 5, mat('--steel', { metalness: 0.7 }), 8); sh.position.y = -0.5; g.add(sh); const hd = cyl(1.9, 1.4, mat('--steel', { metalness: 0.7 }), 12); hd.position.y = 2.3; g.add(hd); return g; } },
+  pcb:   { h: 1.6, make: () => { const g = new THREE.Group(); g.add(box(64, 1.6, 16, mat('--pcb', { roughness: 0.5 })));
+    for (let i = 0; i < 8; i++) { const p = cyl(0.9, 0.3, mat('--steel', { metalness: 0.8 }), 10); p.position.set(-11.3 + 8 + (i >> 1) * 10 + (i & 1) * 2.6, 0.9, -4); g.add(p); } return g; } },
+  led:   { h: 5, make: () => { const g = new THREE.Group(); const m = mat('--bad', { roughness: 0.3, transparent: true, opacity: 0.85 });
+    const c = cyl(1.6, 3.4, m, 12); c.position.y = -0.8; g.add(c); const d = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 8), m); d.position.y = 0.9; g.add(d); return g; } },
 };
-let itemMeshes = {}, strokes = [], holes = [];
+let itemMeshes = {}, strokes = [], holes = [], blobs = [];
 function buildItems(data) {
   for (const m of Object.values(itemMeshes)) world.remove(m);
   for (const s of strokes) world.remove(s.mesh);
   for (const h of holes) world.remove(h.mesh);
-  itemMeshes = {}; strokes = []; holes = [];
+  for (const b of blobs) world.remove(b.mesh);
+  itemMeshes = {}; strokes = []; holes = []; blobs = [];
   for (const e of data.events) if (e.type === 'spawn') {
     const spec = ITEM_SPECS[e.data.kind] || ITEM_SPECS.block;
     const inner = spec.make(); inner.position.y = -spec.h / 2;
     const g = new THREE.Group(); g.add(inner); g.visible = false; world.add(g); itemMeshes[e.data.item] = g;
   }
   // marks and holes ride on whatever part they were made on
-  const ownerAt = (t, p) => { const st = itemStates(t, data); let best = null;
-    for (const [n, s] of Object.entries(st)) if (s.mode === 'at' && Math.hypot(s.pos[0] - p[0], s.pos[1] - p[1]) < 26 && Math.abs(s.pos[2] - p[2]) < 3) best = { n, s }; return best; };
+  const cellPos = (st, n, d = 0) => { const s = st[n]; if (!s || d > 4) return null; if (s.mode === 'at') return s.pos;
+    if (s.mode === 'child') { const p = cellPos(st, s.parent, d + 1); return p && [p[0] + s.off[0], p[1] + s.off[1], p[2] + s.off[2]]; } return null; };
+  const ownerAt = (t, p) => { const st = itemStates(t, data); let best = null, bestD = 1e9;
+    for (const n of Object.keys(st)) { const q = cellPos(st, n); if (!q) continue;
+      const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < 34 && Math.abs(q[2] - p[2]) < 3.1 && d < bestD) { best = { n, s: { pos: q } }; bestD = d; } }
+    return best; };
   for (const e of data.events) {
     if (e.type === 'stroke') {
       const a = e.data.frm, b = e.data.to, len = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -696,6 +806,11 @@ function buildItems(data) {
       const mesh = new THREE.Mesh(new THREE.CircleGeometry(r, 20), basic('--servo')); mesh.rotation.x = -Math.PI / 2;
       const o = ownerAt(e.t, p);
       holes.push({ e, p, mesh, owner: o && o.n, off: o ? [p[0] - o.s.pos[0], p[1] - o.s.pos[1], p[2] - o.s.pos[2]] : null }); world.add(mesh);
+    } else if (e.type === 'solder') {
+      const p = e.data.at;
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 8), mat('--steel', { metalness: 0.9, roughness: 0.15 })); mesh.scale.y = 0.6;
+      const o = ownerAt(e.t, p);
+      blobs.push({ e, p, mesh, owner: o && o.n, off: o ? [p[0] - o.s.pos[0], p[1] - o.s.pos[1], p[2] - o.s.pos[2]] : null }); world.add(mesh);
     }
   }
 }
@@ -707,6 +822,15 @@ function index(d) {
   for (const s of d.segments) (bySeg[s.arm] ||= []).push(s);
   for (const a in bySeg) bySeg[a].sort((x, y) => x.t0 - y.t0);
   steps = d.events.filter(e => e.type === 'step');
+}
+function armBusy(arm, tt) {
+  const segs = bySeg[arm] || [];
+  let lo = 0, hi = segs.length - 1, k = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (segs[m].t0 <= tt) { k = m; lo = m + 1; } else hi = m - 1; }
+  if (k >= 0 && tt <= segs[k].t0 + segs[k].dur + 0.05) return true;
+  let holding = false;
+  for (const e of data.events) { if (e.t > tt) break; if (e.type === 'hold' && e.data.arm === arm) holding = e.data.on; }
+  return holding;
 }
 function jointsAt(arm, tt) {
   const segs = bySeg[arm] || [];
@@ -776,7 +900,8 @@ function update(tt) {
     if (a) { ARMS[a].flange.getWorldPosition(tmpV); ARMS[a].flange.getWorldQuaternion(tmpQ); T.g.position.copy(tmpV); T.g.quaternion.copy(tmpQ); }
     else { T.g.position.copy(W(T.t.slot[0], T.t.slot[1], CELL.racks[T.t.rack].z)); T.g.quaternion.copy(DOWN); }
     const sig = a ? ms.signal[a] : null;
-    if (T.parts.fingers) { const open = sig === 'closed' ? 0 : 1; for (const f of T.parts.fingers) f.m.position.z = f.s * (2.8 + 6.5 * open); }
+    if (T.parts.fingers) { const open = sig === 'closed' ? 0 : 1; for (const f of T.parts.fingers) f.m.position.z = f.s * (f.fine ? 0.9 + 2.6 * open : 2.8 + 6.5 * open); }
+    if (T.parts.hot) T.parts.hot.material.emissive.setHex(sig === 'heat' || sig === 'feed' ? 0xff4a10 : 0x000000);
     if (T.parts.spin) T.parts.spin.rotation.x = (sig === 'slow' || sig === 'fast') ? tt * (sig === 'fast' ? 60 : 25) : 0;
     T.g.updateMatrixWorld(true);
   }
@@ -801,6 +926,12 @@ function update(tt) {
     s.mesh.rotation.y = Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]);
     s.mesh.scale.x = Math.max(f, 0.001);
   }
+  for (const b of blobs) {
+    b.mesh.visible = tt >= b.e.t;
+    if (!b.mesh.visible) continue;
+    const base = b.owner && itemPos[b.owner] ? itemPos[b.owner].clone().add(new THREE.Vector3(b.off[0], b.off[2], -b.off[1])) : W(...b.p);
+    b.mesh.position.copy(base).add(new THREE.Vector3(0, 0.5, 0));
+  }
   for (const h of holes) {
     h.mesh.visible = tt >= h.e.t + h.e.data.dur * 0.6;
     if (!h.mesh.visible) continue;
@@ -824,8 +955,10 @@ function update(tt) {
   const chips = [];
   for (const a of Object.keys(ARMS)) if (ARMS[a].root.visible) {
     const tl = ms.tool[a] ? ms.tool[a] + (ms.bit[a] ? ' + ' + ms.bit[a] : '') : 'no tool';
-    const sig = ms.signal[a]; const live = sig === 'slow' || sig === 'fast' || sig === 'on' || sig === 'push';
-    chips.push(`<span class="chip ${live ? 'live' : ''}"><i style="background:var(--${a})"></i>${a} · ${esc(tl)}${live ? ' · ' + sig : ''}</span>`);
+    const sig = ms.signal[a]; const live = ['slow', 'fast', 'on', 'push', 'heat', 'feed'].includes(sig);
+    const busy = armBusy(a, tt);
+    const state = busy ? (live ? sig : 'working') : (live || ms.signal[a] === 'closed' ? 'waiting' : 'idle');
+    chips.push(`<span class="chip ${live ? 'live' : state === 'idle' ? 'idle' : ''}"><i style="background:var(--${a})"></i>${a} · ${esc(tl)} · ${state}</span>`);
   }
   const busyZones = Object.entries(occ).filter(([, v]) => v.length);
   for (const [zn, v] of busyZones) chips.push(`<span class="chip ${v.length > CELL.zones[zn].capacity ? 'bad' : 'live'}">${zn} ${v.length}/${CELL.zones[zn].capacity}</span>`);
@@ -846,11 +979,26 @@ function update(tt) {
 // ---------- stage switching ----------
 const tabs = document.getElementById('tabs'), guide = document.getElementById('guide'), legend = document.getElementById('legend');
 function renderTabs() {
-  tabs.innerHTML = STAGES.map(s => `<button class="tab" role="tab" type="button" id="tab-${s.id}" aria-selected="${s === stage}"><span class="wk">${s.wk}</span><span class="nm">${s.name}</span></button>`).join('');
+  tabs.innerHTML = STAGES.map(s => `<button class="tab${s.proj ? ' proj' : ''}" role="tab" type="button" id="tab-${s.id}" aria-selected="${s === stage}"><span class="wk">${s.wk}</span><span class="nm">${s.name}</span></button>`).join('');
   STAGES.forEach(s => document.getElementById('tab-' + s.id).onclick = () => setStage(s));
 }
+let mode = 'auto';
+function schedPanel(s) {
+  if (!s.seq || Object.keys(s.data.cell.arms).length < 2) return '';
+  const a = s.data.duration, q = s.seq.duration, saved = Math.round(100 * (1 - a / q));
+  const busy = data.stats?.busy_pct || {};
+  const rows = Object.entries(busy).map(([arm, p]) => `<span>${arm}</span><span class="track"><i style="width:${p}%;background:var(--${arm})"></i></span><span>${p}%</span>`).join('');
+  return `<div class="sched"><div class="head"><div><div class="eyebrow">Schedule</div>
+      <span class="big">${(mode === 'auto' ? a : q).toFixed(0)} s</span>
+      <span class="vs">${mode === 'auto' ? `vs ${q.toFixed(0)} s one step at a time · <b>${saved}% faster</b>` : `one step at a time · auto takes ${a.toFixed(0)} s`}</span></div>
+      <div class="seg" role="group" aria-label="Schedule">
+        <button type="button" data-mode="auto" aria-pressed="${mode === 'auto'}">All arms at once</button>
+        <button type="button" data-mode="seq" aria-pressed="${mode === 'seq'}">One at a time</button></div></div>
+    <div class="util" aria-label="Share of the job each arm is working">${rows}</div>
+    <p class="note">Bars show how much of the job each arm spends moving, using a tool or holding. Switch to "One at a time" to see the idle arms the scheduler removes.</p></div>`;
+}
 function setStage(s, keepHash) {
-  stage = s; data = s.data; index(data); buildItems(data);
+  stage = s; data = mode === 'seq' && s.seq ? s.seq : s.data; index(data); buildItems(data);
   const armsOn = Object.keys(data.cell.arms);
   for (const [name, arm] of Object.entries(ARMS)) arm.root.visible = armsOn.includes(name);
   for (const [n, g] of Object.entries(rackGroups)) g.visible = s.show.racks.includes(n);
@@ -858,10 +1006,11 @@ function setStage(s, keepHash) {
   camRig.visible = armsOn.length > 1;
   for (const [zn, v] of Object.entries(zoneVis)) { const on = armsOn.length > 1 && (s.show.trays || !['kit_tray', 'back'].includes(zn)); v.ring.visible = on; if (v.wall) v.wall.visible = on; }
   scrub.max = data.duration; t = 0; hold = 0; lastHud = '';
-  guide.innerHTML = s.html();
+  guide.innerHTML = schedPanel(s) + s.html();
+  guide.querySelectorAll('.seg button').forEach(b => b.onclick = () => { mode = b.dataset.mode; setStage(stage, true); });
   document.getElementById('steps').innerHTML = steps.map(e => `<li><button type="button" data-i="${e.data.index}" data-t="${e.t}"><span class="t">${e.t.toFixed(1)}s</span><span>${esc(e.data.label)}</span></button></li>`).join('');
   document.querySelectorAll('#steps button').forEach(b => b.onclick = () => { t = +b.dataset.t + 0.01; update(t); });
-  legend.innerHTML = armsOn.map(n => `<span><i style="background:var(--${n})"></i>${n} · ${ROLE[n] || data.cell.arms[n].role}</span>`).join('') + (armsOn.length > 1 ? `<span><i style="background:var(--accent);opacity:.6"></i>shared zone in use</span>` : '');
+  legend.innerHTML = armsOn.map(n => `<span><i style="background:var(--${n})"></i>${n} · ${ROLE[n] || data.cell.arms[n].role}</span>`).join('') + (armsOn.length > 1 ? `<span><i style="background:var(--accent);opacity:.6"></i>shared zone in use</span><span>dashed chip = arm idle</span>` : '');
   renderTabs();
   if (!keepHash) try { history.replaceState(null, '', '#' + s.id); } catch (e) {}
   update(0);
@@ -916,7 +1065,7 @@ document.getElementById('loadjson').onchange = async e => {
   } catch (err) { msg.textContent = 'Could not read that file: ' + err.message; }
 };
 
-const initial = STAGES.find(s => '#' + s.id === location.hash) || STAGES[2];
+const initial = STAGES.find(s => '#' + s.id === location.hash) || STAGES.find(s => s.id === 'drone');
 applyTheme();
 setStage(initial, true);
 if (matchMedia('(prefers-reduced-motion: reduce)').matches) { playing = false; playBtn.textContent = 'Play'; }

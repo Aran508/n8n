@@ -80,7 +80,7 @@ Worst case is the arm stretched flat with the coupler, a 22 g gripper and a 30 g
 | elbow | MG996R | 0.99 kg·cm | 11.0 kg·cm | 9% |
 | wrist | MG90S | 0.29 kg·cm | 2.2 kg·cm | 13% |
 
-No joint goes above 20% with any of the eight tools. The tool changer adds weight at the end of the arm, so the elbow is an MG996R. With an MG90S elbow it would sit at 44%, and the arm could push down with only 0.7 N. With the MG996R it can push **3.4 N** at the fixture, enough to ream plastic.
+No joint goes above 20% with any of the ten tools. The tool changer adds weight at the end of the arm, so the elbow is an MG996R. With an MG90S elbow it would sit at 44%, and the arm could push down with only 0.7 N. With the MG996R it can push **3.4 N** at the fixture, enough to ream plastic.
 
 ## Bill of materials (whole cell)
 
@@ -88,17 +88,18 @@ No joint goes above 20% with any of the eight tools. The tool changer adds weigh
 |---|---|---|---|
 | MG996R servo (base, shoulder, elbow) | 12 | $60 | ₹4,200 |
 | MG90S servo (wrist) | 4 | $12 | ₹800 |
-| SG90 servo (4 latches, 2 gripper jaws, 1 glue plunger) | 7 | $14 | ₹900 |
+| SG90 servo (4 latches, 2 gripper jaws, tweezers, glue plunger) | 8 | $16 | ₹1,000 |
 | PCA9685 16-channel driver | 2 | $8 | ₹600 |
 | ESP32 dev board | 1 | $6 | ₹450 |
 | Raspberry Pi 5 (4 GB), or a Pi 4 | 1 | $60 | ₹5,500 |
 | USB camera, 1080p | 1 | $15 | ₹1,200 |
 | 6 V 15 A supply, e-stop button, wiring | 1 | $28 | ₹2,200 |
-| Tool changers: steel balls, magnets, pogo pins, ID resistors (4 arm sides, 8 tool plates) | – | $20 | ₹1,500 |
+| Tool changers: steel balls, magnets, pogo pins, ID resistors (4 arm sides, 10 tool plates) | – | $23 | ₹1,700 |
 | Tool actuators: N20 1000 rpm motor, micro vacuum pump, 2 mini brushed ESCs | – | $16 | ₹1,300 |
 | Bit set: 2.0 and 3.0 mm reamers, 1.5 mm drill, 90° countersink, 1.5 mm hex | – | $16 | ₹1,300 |
-| Probe microswitch, fine-liner pen, 3 ml syringe | – | $5 | ₹400 |
+| Probe microswitch, fine-liner pen, 3 ml syringe, precision tweezers | – | $7 | ₹550 |
+| USB-C mini soldering iron + N20 solder feeder + 0.5 mm solder | 1 | $30 | ₹2,500 |
 | Filament, M3 screws, bearings, base board | – | $30 | ₹2,400 |
-| **Total** | | **~$290** | **~₹22,750** |
+| **Total** | | **~$327** | **~₹25,600** |
 
 **Power:** 12 MG996Rs draw about 1 A each while moving, so use a 6 V supply rated for at least 15 A. Keep it separate from the ESP32 and Pi, joined only at ground. Put the e-stop in series with the servo supply so that pressing it cuts power in hardware.

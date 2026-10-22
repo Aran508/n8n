@@ -54,8 +54,12 @@ def describe_cell() -> dict:
         "tools": {n: {"type": t.type, "rack": t.rack, "reachable_by": cell.racks[t.rack]["arms"], "length_mm": t.length}
                   for n, t in cell.tools.items()},
         "bits": {n: {"kind": b.kind, "dia_mm": b.dia, "reachable_by": cell.bit_block["arms"]} for n, b in cell.bits.items()},
-        "tool_actions": {"pick/place": "gripper or vacuum", "hold": "clamp or gripper", "machine": "spindle + bit",
+        "tool_actions": {"pick/place": "gripper, tweezers or vacuum", "hold": "clamp or gripper",
+                         "machine": "spindle + bit", "drive": "spindle + hex bit (screws)",
+                         "solder": "iron (list of joint locations)",
                          "draw": "pen or glue (path of [dx, dy] offsets)", "probe": "probe"},
+        "scheduling": "steps run as early as possible (schedule: auto, the default): write them in a sensible "
+                      "order and the planner overlaps work by different arms; set schedule: sequential to disable",
         "locations": cell.raw["locations"],
         "zones": cell.zones,
         "max_wrist_reach_mm": round(max_reach(cell)),
@@ -99,8 +103,10 @@ def plan_recipe(recipe_yaml: str) -> dict:
         tl = Planner(cell, recipe.get("arms")).plan(recipe)
     except (PlanError, yaml.YAMLError, KeyError, TypeError) as e:
         return {"ok": False, "error": str(e)}
-    steps = [{"t": e.t, "step": e.data["label"]} for e in tl.events if e.type == "step"]
-    return {"ok": True, "duration_s": tl.duration, "moves": len(tl.segments), "steps": steps}
+    steps = sorted(({"t": e.t, "arm": e.data.get("arm"), "step": e.data["label"]} for e in tl.events if e.type == "step"),
+                   key=lambda s: s["t"])
+    return {"ok": True, "duration_s": tl.duration, "moves": len(tl.segments), "busy_pct": tl.stats["busy_pct"],
+            "steps": steps}
 
 
 @mcp.tool()

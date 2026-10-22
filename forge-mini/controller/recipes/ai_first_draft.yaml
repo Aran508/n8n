@@ -29,6 +29,8 @@ steps:
     note: Swap the reamer for the countersink
   - machine: {arm: arm4, at: [fixture.hole1, fixture.hole2], depth: 0.8}
     note: Chamfer both holes so the pins start straight
+  - release: {arm: arm2}
+    note: Clamp lets go - pressing pins pushes the plate into the fixture anyway
   - parallel:
       - tool_change: {arm: arm4, tool: none}
       - pick: {arm: arm1, item: pin1, from: pin_cup}
@@ -46,7 +48,6 @@ steps:
     note: Probe out, pen in
   - draw: {arm: arm2, at: fixture, path: [[-4, -10], [-4, -4], [3, -10], [3, -4]]}
     note: Mark the part
-  - release: {arm: arm2}
   - inspect: {at: fixture, check: pins_seated}
     note: Overhead camera checks the finished part
   - parallel:

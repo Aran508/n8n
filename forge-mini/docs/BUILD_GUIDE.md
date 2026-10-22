@@ -44,7 +44,7 @@ There is no conveyor. You load parts by hand: the plate goes in the **kit tray**
 - The right rack with gripper, clamp, spindle and glue.
 - The bit block with its stripper bar, and the five bits.
 
-**The anti-collision rules** are shared zones: each rack and each tray admits one arm at a time, and the fixture admits two. The planner rejects any recipe that breaks one:
+**The anti-collision rules** are shared zones: each rack and each tray admits one arm at a time, and the fixture admits three. On top of that, every pair of tools stays 20 mm apart. The auto scheduler simply waits until there is room. A recipe with `schedule: sequential` runs exactly as written, so the planner rejects it instead:
 
 ```
 $ forge plan recipes/week2_zone_conflict.yaml
@@ -71,15 +71,18 @@ The plate is printed with **1.8 mm pilot holes**. The cell reams them to an exac
 | 5 | arm2 Holder | clamp | hold the plate down |
 | 6 | arm4 Machinist | spindle + ream_2_0 | ream both holes, 5 mm deep at 2 mm/s |
 | 7–8 | arm4 | spindle + csink_90 | swap bit, chamfer both holes |
-| 9–12 | arm1 Assembler | gripper | press pin 1, then pin 2 (spindle goes home in parallel) |
-| 13–14 | arm3 | probe | swap tool, measure both pins: 9.0 ± 0.3 mm |
-| 15–16 | arm3 | pen | swap tool, mark the part |
-| 17–18 | arm2, camera | – | release, overhead camera check |
+| 9 | arm2 | clamp | release (the clamp is only needed while cutting) |
+| 10–13 | arm1 Assembler | gripper | press pin 1, then pin 2 (spindle goes home at the same time) |
+| 14–15 | arm3 | probe | swap tool, measure both pins: 9.0 ± 0.3 mm |
+| 16–17 | arm3 | pen | swap tool, mark the part |
+| 18 | camera | – | overhead camera check |
 | 19–21 | arm1 | gripper | bracket to the finished tray; everyone returns their tools |
 
-About 98 s, 6 tool changes and 2 bit changes.
+About 84 s with the auto scheduler (104 s one step at a time), 6 tool changes and 2 bit changes.
 
 **Done when** 10 brackets in a row probe in tolerance and a 2.0 mm gauge pin slides into a spare reamed hole.
+
+Then move on to the projects in `docs/PROJECTS.md`: micro-drone, desk robot head and LED bar. They add the tweezers and soldering iron, and show the scheduler keeping all four arms busy.
 
 ---
 

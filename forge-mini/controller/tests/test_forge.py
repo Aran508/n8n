@@ -111,3 +111,40 @@ def test_tool_length_moves_the_tcp():
     st = p.state["arm4"]
     flange_z = forward(cell, cell.arms["arm4"], st.joints, C)[2]
     assert abs(flange_z - st.tip[2] - (36 + 16)) < 0.1
+
+
+@pytest.mark.parametrize("name", ["micro_drone", "desk_bot_head", "led_bar", "doweled_bracket", "week2_four_arms"])
+def test_auto_schedule_is_faster_and_collision_free(name):
+    r = recipe(name)
+    auto = Planner(cell, r.get("arms"))
+    tl = auto.plan(r)
+    seq = plan({**r, "schedule": "sequential"})
+    assert tl.duration < 0.9 * seq.duration
+    assert auto._first_conflict(0, tl.duration, None) is None
+
+
+@pytest.mark.parametrize("name", ["micro_drone", "desk_bot_head", "led_bar"])
+def test_projects_finish_in_the_tray(name):
+    events = plan(recipe(name)).events
+    last = [e.data for e in events if e.type == "detach"][-1]
+    assert last["pos"] == list(cell.location("finished"))
+
+
+def test_nearby_work_keeps_recipe_order():
+    steps = {e.data["label"]: e for e in plan(recipe("micro_drone")).events if e.type == "step"}
+    board = steps["Flight controller onto the centre standoffs"]
+    screws = steps["Two M2 screws hold the board"]
+    assert screws.t >= board.data["end"]
+
+
+def test_soldering_needs_the_iron_and_screws_need_a_hex_bit():
+    with pytest.raises(PlanError, match="needs a iron to solder"):
+        plan({"steps": [{"solder": {"arm": "arm4", "at": ["led.j1a"]}}]})
+    r = {"steps": [{"tool_change": {"arm": "arm4", "tool": "spindle"}}, {"bit_change": {"arm": "arm4", "bit": "ream_2_0"}},
+                   {"drive": {"arm": "arm4", "at": ["drone.screw1"]}}]}
+    with pytest.raises(PlanError, match="hex bit"):
+        plan(r)
+
+
+def test_eight_solder_joints_on_the_led_bar():
+    assert sum(1 for e in plan(recipe("led_bar")).events if e.type == "solder") == 8

@@ -1,0 +1,46 @@
+# Project: LED bar, soldered the way you would on a helping-hands station.
+# One arm clamps the PCB, two arms place LEDs from both sides at once, and the
+# soldering arm follows behind them. Arm 1 places with tweezers, arm 3 with
+# the vacuum cup (there is only one pair of tweezers). You load: the PCB in the kit tray, two
+# LEDs in cup A (back) and two in the side pocket (front).
+product: led_bar
+items:
+  pcb: {at: kit.part, kind: pcb}
+  l1: {at: cup_a, kind: led}
+  l2: {at: cup_a, kind: led}
+  l3: {at: side.part, kind: led}
+  l4: {at: side.part, kind: led}
+steps:
+  - tool_change: {arm: arm3, tool: vacuum}
+  - tool_change: {arm: arm1, tool: tweezers}
+  - tool_change: {arm: arm2, tool: clamp}
+  - tool_change: {arm: arm4, tool: iron}
+  - pick:  {arm: arm3, item: pcb, from: kit.part}
+    note: Loader brings the PCB
+  - place: {arm: arm3, to: led.pcb}
+  - hold:  {arm: arm2, at: led.hold}
+    note: Clamp holds the left end of the board - the helping hand
+  - pick:  {arm: arm1, item: l1, from: cup_a}
+    note: LEDs go in from both sides
+  - place: {arm: arm1, to: led.l1, into: pcb, press: 1}
+  - solder: {arm: arm4, at: [led.j1a, led.j1b]}
+    note: Iron follows right behind
+  - pick:  {arm: arm1, item: l2, from: cup_a}
+  - place: {arm: arm1, to: led.l2, into: pcb, press: 1}
+  - solder: {arm: arm4, at: [led.j2a, led.j2b]}
+  - pick:  {arm: arm3, item: l3, from: side.part}
+  - place: {arm: arm3, to: led.l3, into: pcb, press: 1}
+  - solder: {arm: arm4, at: [led.j3a, led.j3b]}
+  - pick:  {arm: arm3, item: l4, from: side.part}
+  - place: {arm: arm3, to: led.l4, into: pcb, press: 1}
+  - solder: {arm: arm4, at: [led.j4a, led.j4b]}
+  - release: {arm: arm2}
+  - inspect: {at: led.pcb, check: eight_joints}
+  - tool_change: {arm: arm1, tool: gripper_A}
+  - pick:  {arm: arm1, item: pcb, from: led.pcb}
+    note: Finished LED bar to the tray
+  - place: {arm: arm1, to: finished}
+  - tool_change: {arm: arm1, tool: none}
+  - tool_change: {arm: arm2, tool: none}
+  - tool_change: {arm: arm3, tool: none}
+  - tool_change: {arm: arm4, tool: none}

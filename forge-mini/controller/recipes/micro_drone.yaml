@@ -1,0 +1,62 @@
+# Project: micro-drone (like the 3D-printed Arduino quad, scaled to a 65 mm
+# "whoop" frame). You load: the printed frame in the kit tray, the flight
+# controller board in the side pocket, 3 coreless motors in cup A, 3 props in
+# cup B (back) and one motor and one prop in cup C (front). The cell presses the motors in, mounts and screws the board,
+# solders the motor leads, fits the props, checks it and unloads it.
+product: micro_drone
+items:
+  frame: {at: kit.part,  kind: drone_frame}
+  fc:    {at: side.part, kind: board}
+  m1: {at: cup_a, kind: motor}
+  m2: {at: cup_a, kind: motor}
+  m3: {at: cup_a, kind: motor}
+  m4: {at: cup_c, kind: motor}
+  p1: {at: cup_b, kind: prop}
+  p2: {at: cup_b, kind: prop}
+  p3: {at: cup_b, kind: prop}
+  p4: {at: cup_c, kind: prop}
+steps:
+  - tool_change: {arm: arm3, tool: vacuum}
+  - tool_change: {arm: arm1, tool: gripper_A}
+  - tool_change: {arm: arm2, tool: gripper_B}
+  - tool_change: {arm: arm4, tool: spindle}
+  - bit_change:  {arm: arm4, bit: hex_1_5}
+  - pick:  {arm: arm3, item: frame, from: kit.part}
+    note: Loader brings the frame to the fixture
+  - place: {arm: arm3, to: drone.frame}
+  - pick:  {arm: arm1, item: m1, from: cup_a}
+    note: Three arms press the four motors in at once
+  - place: {arm: arm1, to: drone.m1, into: frame, press: 2}
+  - pick:  {arm: arm2, item: m2, from: cup_a}
+  - place: {arm: arm2, to: drone.m2, into: frame, press: 2}
+  - pick:  {arm: arm3, item: m4, from: cup_c}
+  - place: {arm: arm3, to: drone.m4, into: frame, press: 2}
+  - pick:  {arm: arm2, item: m3, from: cup_a}
+  - place: {arm: arm2, to: drone.m3, into: frame, press: 2}
+  - pick:  {arm: arm3, item: fc, from: side.part}
+    note: Flight controller onto the centre standoffs
+  - place: {arm: arm3, to: drone.fc, into: frame}
+  - drive: {arm: arm4, at: [drone.screw1, drone.screw2], depth: 2}
+    note: Two M2 screws hold the board
+  - tool_change: {arm: arm4, tool: iron}
+    note: Machinist swaps the screwdriver for the soldering iron
+  - solder: {arm: arm4, at: [drone.pad1, drone.pad2, drone.pad3, drone.pad4]}
+    note: Solder the four motor leads to the board
+  - pick:  {arm: arm1, item: p1, from: cup_b}
+    note: Props go on
+  - place: {arm: arm1, to: drone.p1, into: frame, press: 1}
+  - pick:  {arm: arm2, item: p2, from: cup_b}
+  - place: {arm: arm2, to: drone.p2, into: frame, press: 1}
+  - pick:  {arm: arm3, item: p4, from: cup_c}
+  - place: {arm: arm3, to: drone.p4, into: frame, press: 1}
+  - pick:  {arm: arm2, item: p3, from: cup_b}
+  - place: {arm: arm2, to: drone.p3, into: frame, press: 1}
+  - inspect: {at: drone.frame, check: props_and_joints}
+    note: Camera checks props and solder joints
+  - pick:  {arm: arm1, item: frame, from: drone.frame}
+    note: Finished drone to the tray
+  - place: {arm: arm1, to: finished}
+  - tool_change: {arm: arm1, tool: none}
+  - tool_change: {arm: arm2, tool: none}
+  - tool_change: {arm: arm3, tool: none}
+  - tool_change: {arm: arm4, tool: none}

@@ -1,14 +1,15 @@
 # Forge Mini
 
-A desktop micro-factory prototype: four small servo arms around one work plate. Each arm has an automatic tool changer and shares two tool racks and a reamer and bit block with its neighbours. Claude, or any MCP client, can drive it.
+A desktop micro-factory prototype: four small servo arms around one work plate. Each arm has an automatic tool changer and shares two tool racks and a reamer and bit block with its neighbours. A scheduler keeps all four arms working at once. It builds small DIY electronics, such as a micro-drone, a desk robot head with an OLED face and a soldered LED bar, and Claude, or any MCP client, can drive it.
 
 ```
               back: pin cup · finished tray
      arm1 Assembler ●───────────● arm2 Holder
  left rack  |            [ fixture ]            |  right rack + bit block
  gripper    |                                   |  gripper, clamp,
- vacuum     |                                   |  spindle, glue
- pen, probe |                                   |  reamers, drill, countersink, hex
+ tweezers   |                                   |  spindle, iron, glue
+ vacuum     |                                   |  reamers, drill,
+ pen, probe |                                   |  countersink, hex
      arm3 Loader    ●───────────● arm4 Machinist
               front: kit tray (you load parts here)
 ```
@@ -17,8 +18,9 @@ A desktop micro-factory prototype: four small servo arms around one work plate. 
 
 | Path | What it is |
 |---|---|
-| `sim/forge-mini-sim.html` | Interactive 3D simulation of the four-week build. Open it in any browser. |
+| `sim/forge-mini-sim.html` | Interactive 3D simulation of the four-week build and the three projects. Open it in any browser. |
 | `docs/BUILD_GUIDE.md` | Week-by-week build plan, with what to check in the simulator first |
+| `docs/PROJECTS.md` | The drone, desk-bot and LED-bar projects, and how the scheduler keeps every arm busy |
 | `docs/TOOL_CHANGER.md` | Coupler design, tool ID resistors, racks, bit block, adding a tool |
 | `docs/ARM_DESIGN.md` | Link lengths, joint conventions, IK maths, servo budget, bill of materials |
 | `controller/` | Python: kinematics, recipe planner, hardware executor, vision, MCP server |
@@ -33,9 +35,9 @@ cd controller
 pip install -e ".[dev]"
 forge tools                                       # racks, tools and bits
 forge budget                                      # reach, servo load per tool, reaming force
-forge plan recipes/doweled_bracket.yaml           # validate in the digital twin
-forge export recipes/doweled_bracket.yaml -o b.json   # open b.json in the simulator
-pytest                                            # 34 tests
+forge plan recipes/micro_drone.yaml               # validate, schedule, show arm usage
+forge export recipes/micro_drone.yaml -o d.json   # open d.json in the simulator
+pytest                                            # 47 tests
 ```
 
 To rebuild the simulator after editing recipes or `cell.yaml`, run `python sim/build.py` from this folder.
@@ -52,7 +54,9 @@ steps:
   - tool_change: {arm: arm4, tool: none}      # returns the bit, then the spindle
 ```
 
-Actions: `tool_change`, `bit_change`, `pick`, `place` (with optional `into` and `press`), `hold`, `release`, `machine`, `draw`, `probe`, `inspect`, `move`, `park`, `calibrate`, `wait`. A `parallel` block runs branches at the same time, and a branch can be a list of steps for one arm.
+Actions: `tool_change`, `bit_change`, `pick`, `place` (with optional `into` and `press`), `hold`, `release`, `machine`, `drive` (screws), `solder`, `draw`, `probe`, `inspect`, `move`, `park`, `calibrate`, `wait`.
+
+You don't need to say what runs in parallel. With the default `schedule: auto`, every step starts as soon as its arm, its parts and tools, the shared zones and a 20 mm clearance between tools allow. That makes the projects 30–50% faster than running one step at a time (see `docs/PROJECTS.md`).
 
 ## With the machine
 
@@ -64,4 +68,4 @@ FORGE_PORT=/dev/ttyUSB0 python -m forge.mcp_server   # let Claude drive it
 
 ## How it stays safe
 
-The AI only writes recipes. Each recipe is planned in full before any servo moves: tool, bit and part positions, reach with the mounted tool's length for every 20 mm waypoint, and capacity of the shared zones (racks, trays, fixture). Running needs explicit confirmation. Every tool change is verified by the tool's ID resistor. Below that, the ESP32 has a watchdog, and the e-stop cuts servo power in hardware.
+The AI only writes recipes. Each recipe is planned in full before any servo moves: tool, bit and part positions, reach with the mounted tool's length for every 20 mm waypoint, capacity of the shared zones (racks, trays, fixture), and 20 mm clearance between every pair of tools, checked every 50 ms. Running needs explicit confirmation. Every tool change is verified by the tool's ID resistor. Below that, the ESP32 has a watchdog, and the e-stop cuts servo power in hardware.

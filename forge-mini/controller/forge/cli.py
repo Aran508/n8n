@@ -103,11 +103,17 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.cmd == "plan":
-        steps = [e for e in timeline.events if e.type == "step"]
+        steps = sorted((e for e in timeline.events if e.type == "step"), key=lambda e: e.t)
         print(f"OK: {recipe.get('product')} plans cleanly, {len(steps)} steps, "
-              f"{len(timeline.segments)} moves, {timeline.duration:.1f}s")
+              f"{len(timeline.segments)} moves, {timeline.duration:.1f}s ({timeline.stats['schedule']} schedule)")
         for e in steps:
-            print(f"  {e.t:6.2f}s  {e.data['index']:>2}. {e.data['label']}")
+            who = e.data.get("arm") or "cell"
+            print(f"  {e.t:6.2f}s  {e.data['index']:>2}. [{who}] {e.data['label']}")
+        print("  busy: " + "  ".join(f"{a} {p}%" for a, p in timeline.stats["busy_pct"].items()))
+        if timeline.stats["schedule"] == "auto":
+            seq = Planner(cell, recipe.get("arms")).plan({**recipe, "schedule": "sequential"})
+            saved = 100 * (1 - timeline.duration / seq.duration)
+            print(f"  one step at a time would take {seq.duration:.1f}s; auto schedule saves {saved:.0f}%")
         return 0
 
     if args.cmd == "export":
