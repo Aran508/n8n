@@ -1,36 +1,61 @@
-# What an AI agent might write on its first try: the keychain recipe, but it
-# asks arm3 (bottom-left) to drop the product in the output tray on the far
-# right. The planner rejects it before any servo moves; the agent swaps in
-# arm4, which sits next to the tray, and the result is led_keychain.yaml.
+# What an AI agent might write on its first try: the doweled bracket, but it
+# asks arm2 to fetch the pen. The pen lives in the left rack, which only arm1
+# and arm3 can reach. The planner rejects it before any servo moves; the agent
+# gives the marking job to arm3 and the result is doweled_bracket.yaml.
 product: ai_first_draft
 items:
-  housing: {kind: housing}            # arrives on the conveyor
-  led:     {at: led_tray, kind: led}
-  cap:     {at: cap_tray, kind: cap}
+  plate: {at: kit.plate, kind: plate}
+  pin1:  {at: pin_cup, kind: pin}
+  pin2:  {at: pin_cup, kind: pin}
 steps:
-  - conveyor: {item: housing, from: conveyor_start, to: input}
-    note: Housing rides the conveyor until the IR sensor sees it
-  - pick:  {arm: arm1, item: housing, from: input}
-    note: Loader picks the housing
-  - place: {arm: arm1, to: fixture}
-    note: Loader drops it into the fixture
   - parallel:
-      - hold: {arm: arm2, at: fixture.edge}
-      - pick: {arm: arm4, item: led, from: led_tray}
-    note: Holder clamps the housing while arm4 vacuums up an LED
-  - place: {arm: arm4, to: fixture.slot, into: housing}
-    note: LED goes into the slot
-  - pick:  {arm: arm1, item: cap, from: cap_tray}
-    note: Loader fetches the cap
-  - place: {arm: arm1, to: fixture.top, into: housing}
-    note: Cap sits on top
-  - press: {arm: arm3, at: fixture.top, depth: 3}
-    note: Tool arm presses the cap home
+      - tool_change: {arm: arm3, tool: vacuum}
+      - tool_change: {arm: arm2, tool: clamp}
+    note: Tooling up - arm3 takes the vacuum cup, arm2 the clamp
+  - parallel:
+      - tool_change: {arm: arm1, tool: gripper_A}
+      - - tool_change: {arm: arm4, tool: spindle}
+        - bit_change: {arm: arm4, bit: ream_2_0}
+    note: arm1 takes a gripper; arm4 takes the spindle and loads the 2.0 mm reamer
+  - pick:  {arm: arm3, item: plate, from: kit.plate}
+    note: Loader lifts the plate from the kit tray
+  - place: {arm: arm3, to: fixture}
+    note: ...and seats it in the fixture
+  - hold: {arm: arm2, at: fixture.edge}
+    note: Clamp the plate
+  - machine: {arm: arm4, at: [fixture.hole1, fixture.hole2], depth: 5}
+    note: Ream both pilot holes to 2.0 mm
+  - bit_change: {arm: arm4, bit: csink_90}
+    note: Swap the reamer for the countersink
+  - machine: {arm: arm4, at: [fixture.hole1, fixture.hole2], depth: 0.8}
+    note: Chamfer both holes so the pins start straight
+  - parallel:
+      - tool_change: {arm: arm4, tool: none}
+      - pick: {arm: arm1, item: pin1, from: pin_cup}
+    note: Spindle goes home while arm1 fetches the first pin
+  - place: {arm: arm1, to: fixture.pin1, into: plate, press: 2}
+    note: Press pin 1 into the reamed hole
+  - pick:  {arm: arm1, item: pin2, from: pin_cup}
+  - place: {arm: arm1, to: fixture.pin2, into: plate, press: 2}
+    note: Press pin 2
+  - tool_change: {arm: arm3, tool: probe}
+    note: Loader swaps the vacuum cup for the touch probe
+  - probe: {arm: arm3, at: [fixture.pin1_top, fixture.pin2_top], expect: 9, tol: 0.3}
+    note: Measure both pin heights (9.0 +/- 0.3 mm)
+  - tool_change: {arm: arm2, tool: pen}
+    note: Probe out, pen in
+  - draw: {arm: arm2, at: fixture, path: [[-4, -10], [-4, -4], [3, -10], [3, -4]]}
+    note: Mark the part
   - release: {arm: arm2}
-    note: Holder lets go
-  - inspect: {arm: arm4, at: fixture, check: led_seated}
-    note: Wrist camera checks the LED is seated
-  - pick:  {arm: arm3, item: housing, from: fixture}
-    note: Finished keychain is lifted out
-  - place: {arm: arm3, to: output}
-    note: ...and dropped in the output tray
+  - inspect: {at: fixture, check: pins_seated}
+    note: Overhead camera checks the finished part
+  - parallel:
+      - tool_change: {arm: arm3, tool: none}
+      - pick: {arm: arm1, item: plate, from: fixture}
+    note: Pen goes home while arm1 lifts the finished bracket
+  - place: {arm: arm1, to: finished}
+    note: Into the finished tray
+  - parallel:
+      - tool_change: {arm: arm1, tool: none}
+      - tool_change: {arm: arm2, tool: none}
+    note: Everyone returns their tools

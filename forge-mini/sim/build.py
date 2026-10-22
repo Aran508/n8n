@@ -19,7 +19,9 @@ RECIPES = HERE.parent / "controller" / "recipes"
 
 def export(cell, name):
     recipe, timeline = plan_file(cell, RECIPES / f"{name}.yaml")
-    return export_payload(cell, recipe, timeline)
+    payload = export_payload(cell, recipe, timeline)
+    payload["steps"] = sum(1 for e in timeline.events if e.type == "step")
+    return payload
 
 
 def rejection(cell, name):
@@ -35,7 +37,7 @@ def main():
     data = {
         "week1": export(cell, "week1_single_arm"),
         "week2": export(cell, "week2_four_arms"),
-        "week3": export(cell, "led_keychain"),
+        "week3": export(cell, "doweled_bracket"),
         "conflict_error": rejection(cell, "week2_zone_conflict"),
         "draft_error": rejection(cell, "ai_first_draft"),
     }

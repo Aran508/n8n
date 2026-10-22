@@ -6,90 +6,86 @@ Open `sim/forge-mini-sim.html` in a browser to watch each week.
 ```
 cd forge-mini/controller
 pip install -e ".[dev]"
-forge plan recipes/<recipe>.yaml        # digital-twin check
-forge export recipes/<recipe>.yaml -o my.json   # load my.json in the viewer
+forge plan recipes/<recipe>.yaml                 # digital-twin check
+forge export recipes/<recipe>.yaml -o my.json    # load my.json in the viewer
 ```
+
+There is no conveyor. You load parts by hand: the plate goes in the **kit tray** at the front, and pins go in the **pin cup** at the back. The finished part ends up in the **finished tray** at the back.
 
 ---
 
-## Week 1: one arm on the bench
+## Week 1: one arm, first tool changes
 
-**Goal:** one arm goes exactly where the code says.
+**Goal:** one arm goes where the code says, and its coupler locks, identifies and releases a tool every time.
 
 **Build**
-- Print the base turret and the three links (55 / 80 / 80 / 45 mm).
-- Fit the servos: MG996R on base and shoulder, MG90S on the elbow, SG90 on wrist and gripper.
-- ESP32 + PCA9685 at 0x40, a 6 V 10 A servo supply, and the e-stop in series with it.
+- One arm: MG996R base, shoulder and elbow; MG90S wrist.
+- One coupler on the wrist and a coupler plate on each tool (see `docs/TOOL_CHANGER.md`).
+- The left rack with gripper, vacuum, pen and probe.
+- ESP32 + PCA9685 at 0x40, a 6 V servo supply and the e-stop.
 
 **Do**
 1. Flash `firmware/forge_esp32` (Arduino IDE, with the *Adafruit PWM Servo Driver* and *ArduinoJson* libraries).
-2. In the serial monitor, send `{"cmd":"move","arm":1,"servo":[90,90,90,90,90],"ms":500}` and fit the horns at 90°.
-3. Run `forge budget` to confirm reach and torque.
-4. Run `recipes/week1_single_arm.yaml`: the calibration sweep, then block pick-and-place between pads A and B.
-5. Measure where the block lands. Write each joint's error into `trims.arm1` in `cell.yaml`.
+2. Fit the servo horns at 90°: `{"cmd":"move","arm":1,"servo":[90,90,90,90,20],"ms":500}`.
+3. Plug each tool onto the coupler by hand and send `{"cmd":"status"}`. Check that `tool_ohms` shows that tool's ID resistor.
+4. Run `recipes/week1_single_arm.yaml`: calibration sweep, gripper on, block move, pen on, 40 mm square.
+5. Measure the square with calipers. If it is too small, skewed or rotated, adjust `trims.arm1` in `cell.yaml`.
 
-**Simulation:** arm 1 rises to its ready pose and sweeps each joint ±20°, then moves the block A → B → A.
-
-**Done when** the block lands within 2 mm of the mark 10 times in a row.
+**Done when** 20 tool changes in a row pass the ID check and the square measures 40.0 ± 0.5 mm.
 
 ---
 
-## Week 2: four arms, one plate
+## Week 2: four arms, two racks
 
-**Goal:** four arms work around one plate without colliding.
+**Goal:** four arms change tools and share the plate without touching.
 
 **Build**
-- Three more arms.
-- Second PCA9685 with the A0 pad bridged (address 0x41) for arm 4.
-- The base board, with the arms on a 100 mm circle and the fixture in the centre.
+- Three more arms. Second PCA9685 at 0x41 (bridge the A0 pad).
+- The right rack with gripper, clamp, spindle and glue.
+- The bit block with its stripper bar, and the five bits.
 
-**The anti-collision rule:** the centre of the plate is a shared zone, a 45 mm cylinder that holds at most 2 arms. Each arm owns its corner. The planner rejects any recipe that breaks the rule:
+**The anti-collision rules** are shared zones: each rack and each tray admits one arm at a time, and the fixture admits two. The planner rejects any recipe that breaks one:
 
 ```
 $ forge plan recipes/week2_zone_conflict.yaml
-PLAN REJECTED: zone conflict at t=0.00s: arm1, arm2, arm3 are all in the centre zone (capacity 2).
+PLAN REJECTED: zone conflict in rack_L at t=0.66s: arm1, arm3 are inside at once (capacity 1).
 Put these steps in sequence instead of in parallel.
 ```
 
-**Simulation:** all four arms calibrate at once, then pairs visit the centre, then a hand-off and a press. The zone counter never goes above 2/2.
+**Simulation:** all four calibrate together, then tool up in pairs (one arm per rack). Arm 4 loads a drill from the bit block, arm 3 probes a block, arm 1 moves it and arm 2 clamps it. Then every tool goes home.
 
-**Done when** `week2_four_arms.yaml` runs 5 times with no contact.
+**Done when** `week2_four_arms.yaml` runs 5 times with no contact and every tool ends in its own slot.
 
 ---
 
-## Week 3: first product (LED keychain)
+## Week 3: first product, a doweled bracket
 
-**Goal:** a part arrives, the arms assemble it, check it and unload it.
+**Goal:** you load a printed plate and two pins, and the cell does the rest.
 
-**Build**
-- Conveyor: N20 motor, DRV8833, belt and two rollers.
-- IR break-beam at the end of the belt (GPIO 26).
-- Overhead USB camera, with ArUco markers 0–3 (4x4_50 dictionary) on the plate corners.
-- Vacuum pump on arm 4 (MOSFET on GPIO 25), plus an LED tray and a cap tray.
+The plate is printed with **1.8 mm pilot holes**. The cell reams them to an exact **2.0 mm**, chamfers them, presses two 2 mm dowel pins in, measures the pins, marks the part and unloads it.
 
-**The recipe** (`recipes/led_keychain.yaml`, 12 steps, about 30 s)
+| # | Arm | Tool | Action |
+|---|---|---|---|
+| 1–2 | all | – | tool up: arm3 vacuum, arm2 clamp, arm1 gripper, arm4 spindle + 2.0 mm reamer |
+| 3–4 | arm3 Loader | vacuum | plate from kit tray to fixture |
+| 5 | arm2 Holder | clamp | hold the plate down |
+| 6 | arm4 Machinist | spindle + ream_2_0 | ream both holes, 5 mm deep at 2 mm/s |
+| 7–8 | arm4 | spindle + csink_90 | swap bit, chamfer both holes |
+| 9–12 | arm1 Assembler | gripper | press pin 1, then pin 2 (spindle goes home in parallel) |
+| 13–14 | arm3 | probe | swap tool, measure both pins: 9.0 ± 0.3 mm |
+| 15–16 | arm3 | pen | swap tool, mark the part |
+| 17–18 | arm2, camera | – | release, overhead camera check |
+| 19–21 | arm1 | gripper | bracket to the finished tray; everyone returns their tools |
 
-| # | Arm | Action |
-|---|---|---|
-| 1 | cell | conveyor brings the housing until the IR sensor sees it |
-| 2–3 | arm1 Loader | pick the housing, place it in the fixture |
-| 4 | arm2 + arm4 | in parallel: arm2 clamps the housing, arm4 vacuums up an LED |
-| 5 | arm4 | LED into the slot |
-| 6–7 | arm1 | fetch the cap, set it on top |
-| 8 | arm3 Tool | press the cap home (3 mm) |
-| 9 | arm2 | release |
-| 10 | arm4 | camera check: LED seated |
-| 11–12 | arm4 | unload to the output tray |
+About 98 s, 6 tool changes and 2 bit changes.
 
-Fixtures with funnels and V-guides matter more than servo precision. Hobby servos are only accurate to ±1–2 mm, so let the fixture finish the alignment.
-
-**Done when** 10 keychains in a row pass the inspection step.
+**Done when** 10 brackets in a row probe in tolerance and a 2.0 mm gauge pin slides into a spare reamed hole.
 
 ---
 
 ## Week 4: Claude takes the controls
 
-**Goal:** you describe what you want, and Claude writes, checks and runs the recipe.
+**Goal:** you describe the part, and Claude picks the tools, writes the recipe, checks it and runs it.
 
 **Set up on the Pi**
 ```
@@ -109,28 +105,32 @@ Claude Desktop / Claude Code MCP config:
 ```
 Without `FORGE_PORT` the server runs in simulation-only mode, which is a safe way to try it first.
 
-**Tools Claude gets:** `describe_cell`, `check_reach`, `list_recipes`, `get_recipe`, `plan_recipe`, `save_recipe`, `run_recipe` (needs `confirm=true`), `machine_status`, `stop`.
+**Tools Claude gets:** `describe_cell` (arms, tools, racks, bits, zones), `check_reach`, `list_recipes`, `get_recipe`, `plan_recipe`, `save_recipe`, `run_recipe` (needs `confirm=true`), `machine_status`, `stop`.
 
-**What a session looks like.** Claude's first draft (`recipes/ai_first_draft.yaml`) asks arm 3 to unload. The planner answers:
+**What a session looks like.** Claude's first draft (`recipes/ai_first_draft.yaml`) asks arm 2 to fetch the pen. The planner answers:
 
 ```
-step 12 (...and dropped in the output tray): arm3 cannot reach (105, 0, 35): wrist needs 191 mm, max is 152 mm
+step 15 (Probe out, pen in): arm2 cannot reach rack_L, where pen lives; use arm1 or arm3
 ```
 
-Claude switches that step to arm 4, which sits next to the tray. The plan is clean, Claude asks you, and the run starts.
+Claude gives the marking to arm 3, the plan comes back clean, Claude asks you, and the run starts. Other errors are just as specific, for example:
+- `arm3 needs a gripper/vacuum tool to pick but holds no tool; add tool_change: {arm: arm3, tool: gripper_A} first`
+- `pen is on arm1; return it first with tool_change: {arm: arm1, tool: none}`
+- `arm4 has the spindle but no bit; add bit_change: {arm: arm4, bit: ...}`
 
 **Safety layers, top to bottom**
 1. The model can only submit recipes. It never sends raw servo commands.
-2. The planner checks reach, joint limits and zone capacity for every 20 mm waypoint.
+2. The planner tracks every tool, bit and part, checks reach for every 20 mm waypoint with the mounted tool's length, and enforces the zones.
 3. `run_recipe` refuses to run without explicit confirmation.
-4. The ESP32 watchdog freezes the arms if the Pi stops talking for 1.5 s.
-5. The hardware e-stop cuts servo power, and software cannot override it.
+4. Every tool change is checked against the tool's ID resistor.
+5. The ESP32 watchdog stops arms and spindles if the Pi goes quiet for 1.5 s.
+6. The hardware e-stop cuts servo power, and software cannot override it.
 
 ---
 
 ## After the prototype
 
-- Swap the MG996R/MG90S servos for steppers or smart servos with position feedback (STS3215 or Dynamixel).
-- Add tool changers (magnet + peg) so any arm can pick up a soldering pen, screwdriver or glue pen.
-- Move motion planning to ROS 2 + MoveIt 2 for real collision meshes instead of zones.
-- Scale the links: everything in `cell.yaml` is a parameter, and `forge budget` tells you which servos you need.
+- Add more tools: a soldering pen (with a heat-resistant coupler plate), a screwdriver with torque sensing, or a laser pointer for alignment.
+- Swap hobby servos for smart servos with position feedback (STS3215 or Dynamixel) for stiffer, more accurate machining.
+- Move to ROS 2 + MoveIt 2 for real collision meshes instead of zones.
+- Scale the links. Everything is a parameter in `cell.yaml`, and `forge budget` tells you which servos you need.

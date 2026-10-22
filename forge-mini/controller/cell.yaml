@@ -1,30 +1,35 @@
-# Forge Mini cell definition.
+# Forge Mini cell definition (tool-changer edition).
 # World frame: origin = centre of the work plate top surface, X right, Y away
 # from the operator, Z up. All lengths in millimetres, angles in degrees.
+#
+#                 back: pin cup . finished tray
+#        arm1 Assembler ●───────────● arm2 Holder
+#   left tool rack  |      [ fixture ]      |  right tool rack + bit block
+#        arm3 Loader    ●───────────● arm4 Machinist
+#                 front: kit tray (you load parts here)
 
-links:            # identical geometry for all four arms (see docs/ARM_DESIGN.md)
-  h0: 55          # work-plate top -> shoulder axis
-  L1: 80          # shoulder -> elbow (upper arm)
-  L2: 80          # elbow -> wrist (forearm)
-  L3: 45          # wrist -> tool tip
+links:            # identical for all four arms (see docs/ARM_DESIGN.md)
+  h0: 55          # plate top -> shoulder axis
+  L1: 80          # shoulder -> elbow
+  L2: 80          # elbow -> wrist
+  coupler: 22     # wrist axis -> tool-changer face (the "flange")
 
-# Arms sit on a 100 mm circle around the plate centre, one per corner.
-# `yaw` is the direction the arm faces when its base servo is at 90 deg
-# (pointing at the plate centre).
 arms:
-  arm1: {role: loader,  base: [-70.7,  70.7], yaw: -45,  tool: gripper, board: 0x40, first_channel: 0}
-  arm2: {role: holder,  base: [ 70.7,  70.7], yaw: -135, tool: gripper, board: 0x40, first_channel: 5}
-  arm3: {role: tool,    base: [-70.7, -70.7], yaw: 45,   tool: press,   board: 0x40, first_channel: 10}
-  arm4: {role: inspect, base: [ 70.7, -70.7], yaw: 135,  tool: vacuum,  board: 0x41, first_channel: 0}
+  arm1: {role: assembler, base: [-70.7,  70.7], yaw: -45,  board: 0x40, first_channel: 0,  id_pin: 32}
+  arm2: {role: holder,    base: [ 70.7,  70.7], yaw: -135, board: 0x40, first_channel: 6,  id_pin: 33}
+  arm3: {role: loader,    base: [-70.7, -70.7], yaw: 45,   board: 0x41, first_channel: 0,  id_pin: 34}
+  arm4: {role: machinist, base: [ 70.7, -70.7], yaw: 135,  board: 0x41, first_channel: 6,  id_pin: 35}
 
-# Joint -> servo mapping. servo_deg = offset + sign * joint_deg + trim
-# Trims are per arm and come from the calibration step (week 1).
+# Channels per arm: base, shoulder, elbow, wrist, lock (coupler latch), tool signal.
+# servo_deg = offset + sign * joint_deg + trim
 servo_map:
   base:     {offset: 90, sign: 1,  min: -90,  max: 90}
   shoulder: {offset: 0,  sign: 1,  min: 0,    max: 180}
   elbow:    {offset: 0,  sign: -1, min: -180, max: 0}
   wrist:    {offset: 90, sign: 1,  min: -90,  max: 90}
-  tool:     {offset: 0,  sign: 1,  min: 0,    max: 180}
+  lock:     {offset: 0,  sign: 1,  min: 0,    max: 180}
+
+lock: {open: 20, locked: 105}   # coupler cam servo
 
 trims:
   arm1: [0, 0, 0, 0, 0]
@@ -32,45 +37,75 @@ trims:
   arm3: [0, 0, 0, 0, 0]
   arm4: [0, 0, 0, 0, 0]
 
+# Tool catalogue. length = coupler face -> tool centre point (TCP).
+# id_ohms is the resistor in the tool that tells the ESP32 which tool is on.
+# signal = what the tool-signal channel means for this tool.
 tools:
-  gripper: {open: 20, closed: 95}
-  vacuum:  {open: 90, closed: 90, pump_channel: pump}
-  press:   {open: 90, closed: 90}
+  gripper_A: {type: gripper, rack: rack_L, slot: [-104,  30], length: 38, mass: 22, id_ohms: 1000,
+              signal: {open: 30, closed: 100}}
+  vacuum:    {type: vacuum,  rack: rack_L, slot: [-104,  10], length: 34, mass: 20, id_ohms: 2200,
+              signal: {off: 0, on: 180}}
+  pen:       {type: pen,     rack: rack_L, slot: [-104, -10], length: 46, mass: 8,  id_ohms: 3300}
+  probe:     {type: probe,   rack: rack_L, slot: [-104, -30], length: 44, mass: 10, id_ohms: 4700}
+  gripper_B: {type: gripper, rack: rack_R, slot: [104,  30], length: 38, mass: 22, id_ohms: 1000,
+              signal: {open: 30, closed: 100}}
+  clamp:     {type: clamp,   rack: rack_R, slot: [104,  10], length: 30, mass: 12, id_ohms: 6800}
+  spindle:   {type: spindle, rack: rack_R, slot: [104, -10], length: 36, mass: 28, id_ohms: 10000,
+              signal: {off: 0, slow: 90, fast: 180}}
+  glue:      {type: dispenser, rack: rack_R, slot: [104, -30], length: 48, mass: 24, id_ohms: 15000,
+              signal: {stop: 90, push: 140}}
+
+# Racks are shelves with holes; tools hang through them like a reamer stand.
+racks:
+  rack_L: {z: 40, arms: [arm1, arm3]}
+  rack_R: {z: 40, arms: [arm2, arm4]}
+
+# Bits for the spindle, standing shank-up in a block (the "reamer set").
+# stickout = collet face -> cutting tip. strip = direction the spindle slides
+# to pull a bit off its magnetic collet under the stripper bar.
+bit_block: {z: 20, strip: [-12, 0], arms: [arm2, arm4]}
+bits:
+  ream_2_0:  {kind: reamer,      dia: 2.0, stickout: 16, slot: [82, -24]}
+  ream_3_0:  {kind: reamer,      dia: 3.0, stickout: 18, slot: [82, -12]}
+  drill_1_5: {kind: drill,       dia: 1.5, stickout: 14, slot: [82,   0]}
+  csink_90:  {kind: countersink, dia: 6.0, stickout: 10, slot: [82,  12]}
+  hex_1_5:   {kind: hex_driver,  dia: 1.5, stickout: 14, slot: [82,  24]}
 
 motion:
-  speed_mm_s: 80        # cartesian speed used to size move durations
+  speed_mm_s: 80        # cartesian travel speed
+  feed_mm_s: 2          # cutting feed for reamers / drills
   min_move_ms: 250
-  approach_height: 35   # mm above a location before descending
-  tool_pitch: -90       # tool points straight down
+  approach_height: 30   # mm above a location before descending
+  tool_pitch: -90       # tools point straight down
 
-# Shared centre zone: a vertical cylinder over the fixture. At most
-# `capacity` arms may be inside it at the same time.
-zone:
-  center: [0, 0]
-  radius: 45
-  capacity: 2
+# Shared areas. At most `capacity` arms may be inside each at once.
+zones:
+  centre:   {center: [0, 0],     radius: 45, capacity: 2}
+  rack_L:   {center: [-104, 0],  radius: 40, capacity: 1}
+  rack_R:   {center: [96, 0],    radius: 40, capacity: 1}
+  kit_tray: {center: [0, -108],  radius: 32, capacity: 1}
+  back:     {center: [0, 108],   radius: 50, capacity: 1}
 
-# Named places (x, y, z of the surface the tool touches).
+# Named places: (x, y, z) of the surface the TCP touches.
 locations:
-  conveyor_start: [-150, 0, 0]
-  input:          [-105, 0, 0]
-  fixture:        [0, 0, 6]
-  fixture.slot:   [0, 0, 10]
-  fixture.top:    [0, 0, 14]
-  fixture.edge:   [14, 14, 12]
-  led_tray:       [0, -105, 4]
-  cap_tray:       [0, 105, 4]
-  output:         [105, 0, 0]
+  fixture:        [0, 0, 5]
+  fixture.edge:   [0, 11, 5]
+  fixture.hole1:  [-12, 0, 5]
+  fixture.hole2:  [12, 0, 5]
+  fixture.pin1:   [-12, 0, 11]
+  fixture.pin2:   [12, 0, 11]
+  fixture.pin1_top: [-12, 0, 9]
+  fixture.pin2_top: [12, 0, 9]
+  kit.plate:      [0, -108, 2]
+  pin_cup:        [-28, 104, 10]
+  finished:       [32, 108, 2]
   cal_a:          [-45, 30, 0]
   cal_b:          [-20, 75, 0]
+  cal_square:     [-15, 40, 0]
 
-# Where each arm parks when it is not working (inside its own corner).
+# Park poses are for the coupler face, so the arm's pose is the same whatever tool it holds.
 park:
   arm1: [-40, 40, 60]
   arm2: [40, 40, 60]
   arm3: [-40, -40, 60]
   arm4: [40, -40, 60]
-
-conveyor:
-  speed_mm_s: 60
-  channel: conveyor

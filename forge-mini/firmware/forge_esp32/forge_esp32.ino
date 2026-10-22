@@ -1,15 +1,24 @@
-// Forge Mini motion controller (ESP32 + 2x PCA9685).
+// Forge Mini motion controller (ESP32 + 2x PCA9685), tool-changer edition.
 //
-// The Raspberry Pi plans everything; this board only moves servos smoothly,
-// switches the pump/conveyor, reads sensors and enforces safety. It speaks
-// newline-delimited JSON over USB serial at 115200 baud:
+// The Raspberry Pi plans everything; this board moves servos smoothly, drives
+// each arm's tool-signal line, identifies the mounted tools and enforces
+// safety. Newline-delimited JSON over USB serial at 115200 baud:
 //
-//   {"cmd":"move","arm":1,"servo":[90,120,80,60,20],"ms":400}
-//   {"cmd":"aux","ch":"pump","on":true}        ch: pump | conveyor
+//   {"cmd":"move","arm":1,"servo":[90,120,80,60,105],"ms":400}
+//        servo = base, shoulder, elbow, wrist, coupler latch
+//   {"cmd":"tool","arm":4,"value":90}      tool-signal channel (servo-style PWM)
 //   {"cmd":"status"}  {"cmd":"ping"}  {"cmd":"reset"}  {"cmd":"relax"}
 //
 // Replies:  {"ok":true}  /  {"ok":false,"err":"..."}
-// Events:   {"event":"ir","state":1}  {"event":"estop"}  {"event":"watchdog"}
+// Events:   {"event":"probe","arm":3}  {"event":"estop"}  {"event":"watchdog"}
+//
+// Tool coupler (per arm): 4 pogo pins = 6 V, GND, SIG, ID.
+//   SIG: servo PWM from the PCA9685. A gripper uses it directly; the spindle,
+//        vacuum pump and glue plunger have a tiny brushed ESC that reads it.
+//   ID:  each tool has a resistor from ID to GND. A 10k pull-up to 3.3 V on
+//        the ESP32 side turns it into a voltage, so we know which tool is on.
+//        The probe's resistor is in series with a normally-closed switch, so
+//        a touch reads as "open" for a moment -> probe event.
 //
 // Libraries: Adafruit PWM Servo Driver, ArduinoJson (v7).
 
@@ -17,27 +26,24 @@
 #include <Adafruit_PWMServoDriver.h>
 #include <ArduinoJson.h>
 
-// ---------------- pins ----------------
-const int PIN_ESTOP = 27;      // normally-closed button to GND (also cuts servo power in hardware)
-const int PIN_IR = 26;         // IR break-beam at the end of the conveyor, LOW = part present
-const int PIN_PUMP = 25;       // MOSFET gate for the vacuum pump
-const int PIN_CONV_A = 32;     // DRV8833 IN1/IN2 for the conveyor N20 motor
-const int PIN_CONV_B = 33;
-const int CONVEYOR_DUTY = 180; // 0..255
+const int PIN_ESTOP = 27;  // normally-closed button to GND (also cuts servo power in hardware)
+const int ID_PINS[4] = {32, 33, 34, 35};  // ADC1 pins, one per arm coupler
+const float ID_PULLUP_OHMS = 10000.0f;
+const float PROBE_OHMS = 4700.0f;
 
-// ---------------- servos ----------------
-Adafruit_PWMServoDriver board0(0x40);  // arms 1-3 (channels 0-14)
-Adafruit_PWMServoDriver board1(0x41);  // arm 4 (channels 0-4), spares
+Adafruit_PWMServoDriver board0(0x40);  // arms 1-2, channels 0-11
+Adafruit_PWMServoDriver board1(0x41);  // arms 3-4, channels 0-11
 
 const int NUM_ARMS = 4;
-const int JOINTS = 5;
+const int JOINTS = 5;  // base, shoulder, elbow, wrist, latch
 struct ArmMap { Adafruit_PWMServoDriver *board; uint8_t firstChannel; };
-ArmMap ARM_MAP[NUM_ARMS] = { {&board0, 0}, {&board0, 5}, {&board0, 10}, {&board1, 0} };
+ArmMap ARM_MAP[NUM_ARMS] = { {&board0, 0}, {&board0, 6}, {&board1, 0}, {&board1, 6} };
+// channel firstChannel + 5 is the tool signal
 
 const int SERVO_MIN_US = 500;
 const int SERVO_MAX_US = 2500;
-const uint32_t TICK_MS = 10;          // 100 Hz interpolation
-const uint32_t WATCHDOG_MS = 1500;    // freeze if the Pi goes quiet
+const uint32_t TICK_MS = 10;        // 100 Hz interpolation
+const uint32_t WATCHDOG_MS = 1500;  // freeze if the Pi goes quiet
 
 struct Motion {
   float from[JOINTS];
@@ -48,27 +54,42 @@ struct Motion {
   bool active;
 };
 Motion arms[NUM_ARMS];
+float toolSignal[NUM_ARMS] = {0, 0, 0, 0};
 
 bool estopLatched = false;
-bool relaxed = true;     // PWM off until the first move (no power-on jump)
+bool relaxed = true;  // PWM off until the first move (no power-on jump)
 uint32_t lastHostMsg = 0;
-int lastIr = -1;
 
-// Park pose in servo degrees; replace with your calibrated values.
+// Park pose in servo degrees with the latch open; replace with your calibrated values.
 const float PARK[JOINTS] = {90, 115, 131, 17, 20};
 
-void writeServo(int arm, int joint, float deg) {
+uint16_t degToTicks(float deg) {
   deg = constrain(deg, 0.0f, 180.0f);
   float us = SERVO_MIN_US + (SERVO_MAX_US - SERVO_MIN_US) * deg / 180.0f;
-  uint16_t ticks = (uint16_t)(us * 4096.0f / 20000.0f);  // 50 Hz frame = 20 ms
-  ARM_MAP[arm].board->setPWM(ARM_MAP[arm].firstChannel + joint, 0, ticks);
+  return (uint16_t)(us * 4096.0f / 20000.0f);  // 50 Hz frame = 20 ms
+}
+
+void writeChannel(int arm, int ch, float deg) {
+  ARM_MAP[arm].board->setPWM(ARM_MAP[arm].firstChannel + ch, 0, degToTicks(deg));
+}
+
+void offChannel(int arm, int ch) {
+  ARM_MAP[arm].board->setPWM(ARM_MAP[arm].firstChannel + ch, 0, 4096);
+}
+
+void toolsOff() {
+  for (int a = 0; a < NUM_ARMS; a++) {
+    toolSignal[a] = 0;
+    offChannel(a, 5);  // spindles, pumps and plungers stop with no signal
+  }
 }
 
 void relaxAll() {
   for (int a = 0; a < NUM_ARMS; a++) {
-    for (int j = 0; j < JOINTS; j++) ARM_MAP[a].board->setPWM(ARM_MAP[a].firstChannel + j, 0, 4096);
+    for (int j = 0; j < JOINTS; j++) offChannel(a, j);
     arms[a].active = false;
   }
+  toolsOff();
   relaxed = true;
 }
 
@@ -79,14 +100,13 @@ void freezeAll() {
   }
 }
 
-void setConveyor(bool on) {
-  analogWrite(PIN_CONV_A, on ? CONVEYOR_DUTY : 0);
-  analogWrite(PIN_CONV_B, 0);
-}
-
-void stopAux() {
-  digitalWrite(PIN_PUMP, LOW);
-  setConveyor(false);
+// Resistance of the tool's ID resistor, or -1 when nothing is connected.
+float toolOhms(int arm) {
+  int raw = 0;
+  for (int i = 0; i < 4; i++) raw += analogRead(ID_PINS[arm]);
+  raw /= 4;
+  if (raw > 3950) return -1;
+  return ID_PULLUP_OHMS * raw / (4095.0f - raw);
 }
 
 void reply(bool ok, const char *err = nullptr) {
@@ -97,10 +117,10 @@ void reply(bool ok, const char *err = nullptr) {
   Serial.println();
 }
 
-void emit(const char *name, int state = -1) {
+void emit(const char *name, int arm = 0) {
   JsonDocument doc;
   doc["event"] = name;
-  if (state >= 0) doc["state"] = state;
+  if (arm) doc["arm"] = arm;
   serializeJson(doc, Serial);
   Serial.println();
 }
@@ -122,13 +142,14 @@ void handleMove(JsonDocument &doc) {
   reply(true);
 }
 
-void handleAux(JsonDocument &doc) {
+void handleTool(JsonDocument &doc) {
   if (estopLatched) return reply(false, "estop");
-  const char *ch = doc["ch"] | "";
-  bool on = doc["on"] | false;
-  if (strcmp(ch, "pump") == 0) digitalWrite(PIN_PUMP, on ? HIGH : LOW);
-  else if (strcmp(ch, "conveyor") == 0) setConveyor(on);
-  else return reply(false, "bad channel");
+  int arm = doc["arm"] | 0;
+  if (arm < 1 || arm > NUM_ARMS) return reply(false, "bad arm");
+  float value = doc["value"] | 0.0f;
+  toolSignal[arm - 1] = value;
+  if (value <= 0) offChannel(arm - 1, 5);
+  else writeChannel(arm - 1, 5, value);
   reply(true);
 }
 
@@ -136,12 +157,17 @@ void handleStatus() {
   JsonDocument doc;
   doc["ok"] = true;
   doc["estop"] = estopLatched;
-  doc["ir"] = digitalRead(PIN_IR) == LOW ? 1 : 0;
   doc["relaxed"] = relaxed;
   JsonArray list = doc["arms"].to<JsonArray>();
+  JsonArray ids = doc["tool_ohms"].to<JsonArray>();
+  JsonArray sig = doc["tool_signal"].to<JsonArray>();
   for (int a = 0; a < NUM_ARMS; a++) {
     JsonArray row = list.add<JsonArray>();
     for (int j = 0; j < JOINTS; j++) row.add(round(arms[a].now[j] * 10) / 10.0);
+    float ohms = toolOhms(a);
+    if (ohms < 0) ids.add(nullptr);
+    else ids.add((int)ohms);
+    sig.add(toolSignal[a]);
     doc["moving"][a] = arms[a].active;
   }
   serializeJson(doc, Serial);
@@ -154,7 +180,7 @@ void handleLine(const String &line) {
   lastHostMsg = millis();
   const char *cmd = doc["cmd"] | "";
   if (strcmp(cmd, "move") == 0) handleMove(doc);
-  else if (strcmp(cmd, "aux") == 0) handleAux(doc);
+  else if (strcmp(cmd, "tool") == 0) handleTool(doc);
   else if (strcmp(cmd, "status") == 0) handleStatus();
   else if (strcmp(cmd, "ping") == 0) reply(true);
   else if (strcmp(cmd, "relax") == 0) { relaxAll(); reply(true); }
@@ -165,14 +191,24 @@ void handleLine(const String &line) {
   } else reply(false, "unknown cmd");
 }
 
+// A seated probe reads ~4.7k. When its switch opens on contact the line reads
+// open. (Releasing the probe at the rack looks the same; the Pi only counts
+// probe events during a probing move, so that one is harmless.)
+void watchProbes() {
+  static float last[NUM_ARMS] = {-1, -1, -1, -1};
+  for (int a = 0; a < NUM_ARMS; a++) {
+    float ohms = toolOhms(a);
+    bool wasProbe = last[a] > 0 && fabs(last[a] - PROBE_OHMS) < 0.25f * PROBE_OHMS;
+    if (wasProbe && ohms < 0) emit("probe", a + 1);
+    last[a] = ohms;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_ESTOP, INPUT_PULLUP);
-  pinMode(PIN_IR, INPUT_PULLUP);
-  pinMode(PIN_PUMP, OUTPUT);
-  pinMode(PIN_CONV_A, OUTPUT);
-  pinMode(PIN_CONV_B, OUTPUT);
-  stopAux();
+  analogReadResolution(12);
+  for (int a = 0; a < NUM_ARMS; a++) pinMode(ID_PINS[a], INPUT);  // external 10k pull-ups to 3.3 V
 
   Wire.begin();
   board0.begin();
@@ -198,26 +234,23 @@ void loop() {
   if (!estopLatched && digitalRead(PIN_ESTOP) == HIGH) {
     estopLatched = true;
     freezeAll();
-    stopAux();
     relaxAll();
     emit("estop");
   }
 
-  // Watchdog: anything moving with a silent host gets frozen
-  bool anyActive = false;
-  for (int a = 0; a < NUM_ARMS; a++) anyActive |= arms[a].active;
-  if (anyActive && millis() - lastHostMsg > WATCHDOG_MS) {
+  // Watchdog: anything moving or spinning with a silent host gets stopped
+  bool busy = false;
+  for (int a = 0; a < NUM_ARMS; a++) busy |= arms[a].active || toolSignal[a] > 0;
+  if (busy && millis() - lastHostMsg > WATCHDOG_MS) {
     freezeAll();
-    stopAux();
+    toolsOff();
     emit("watchdog");
   }
-
-  int ir = digitalRead(PIN_IR) == LOW ? 1 : 0;
-  if (ir != lastIr) { lastIr = ir; emit("ir", ir); }
 
   static uint32_t lastTick = 0;
   if (millis() - lastTick < TICK_MS) return;
   lastTick = millis();
+  watchProbes();
   if (relaxed) return;
 
   for (int a = 0; a < NUM_ARMS; a++) {
@@ -229,6 +262,6 @@ void loop() {
       // short straight segments, so the arm flows from one to the next.
       for (int j = 0; j < JOINTS; j++) m.now[j] = m.from[j] + (m.to[j] - m.from[j]) * f;
     }
-    for (int j = 0; j < JOINTS; j++) writeServo(a, j, m.now[j]);
+    for (int j = 0; j < JOINTS; j++) writeChannel(a, j, m.now[j]);
   }
 }

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-JOINTS = ("base", "shoulder", "elbow", "wrist", "tool")
+JOINTS = ("base", "shoulder", "elbow", "wrist", "lock")
 DEFAULT_CELL = Path(__file__).resolve().parent.parent / "cell.yaml"
 
 
@@ -17,7 +17,7 @@ class Links:
     h0: float
     L1: float
     L2: float
-    L3: float
+    coupler: float
 
 
 @dataclass(frozen=True)
@@ -28,15 +28,36 @@ class JointMap:
     max: float
 
 
+@dataclass(frozen=True)
+class Tool:
+    name: str
+    type: str
+    rack: str
+    slot: tuple[float, float]
+    length: float
+    mass: float
+    id_ohms: int
+    signal: dict
+
+
+@dataclass(frozen=True)
+class Bit:
+    name: str
+    kind: str
+    dia: float
+    stickout: float
+    slot: tuple[float, float]
+
+
 @dataclass
 class Arm:
     name: str
     role: str
     base: tuple[float, float]
     yaw: float
-    tool: str
     board: int
     first_channel: int
+    id_pin: int
     trims: list[float] = field(default_factory=lambda: [0.0] * 5)
 
     def to_local(self, x: float, y: float) -> tuple[float, float]:
@@ -55,12 +76,15 @@ class Cell:
     links: Links
     arms: dict[str, Arm]
     servo_map: dict[str, JointMap]
-    tools: dict[str, dict]
+    lock: dict
+    tools: dict[str, Tool]
+    racks: dict[str, dict]
+    bits: dict[str, Bit]
+    bit_block: dict
     motion: dict
-    zone: dict
+    zones: dict[str, dict]
     locations: dict[str, tuple[float, float, float]]
     park: dict[str, tuple[float, float, float]]
-    conveyor: dict
     raw: dict
 
     def location(self, ref) -> tuple[float, float, float]:
@@ -90,22 +114,42 @@ def load_cell(path: str | Path = DEFAULT_CELL) -> Cell:
             role=a["role"],
             base=(float(a["base"][0]), float(a["base"][1])),
             yaw=float(a["yaw"]),
-            tool=a["tool"],
             board=int(a["board"]),
             first_channel=int(a["first_channel"]),
+            id_pin=int(a["id_pin"]),
             trims=[float(t) for t in trims.get(name, [0] * 5)],
         )
         for name, a in raw["arms"].items()
+    }
+    tools = {
+        name: Tool(
+            name=name,
+            type=t["type"],
+            rack=t["rack"],
+            slot=(float(t["slot"][0]), float(t["slot"][1])),
+            length=float(t["length"]),
+            mass=float(t["mass"]),
+            id_ohms=int(t["id_ohms"]),
+            signal=t.get("signal", {}),
+        )
+        for name, t in raw["tools"].items()
+    }
+    bits = {
+        name: Bit(name, b["kind"], float(b["dia"]), float(b["stickout"]), (float(b["slot"][0]), float(b["slot"][1])))
+        for name, b in raw["bits"].items()
     }
     return Cell(
         links=Links(**{k: float(v) for k, v in raw["links"].items()}),
         arms=arms,
         servo_map={k: JointMap(**v) for k, v in raw["servo_map"].items()},
-        tools=raw["tools"],
+        lock=raw["lock"],
+        tools=tools,
+        racks=raw["racks"],
+        bits=bits,
+        bit_block=raw["bit_block"],
         motion=raw["motion"],
-        zone=raw["zone"],
+        zones=raw["zones"],
         locations={k: tuple(float(c) for c in v) for k, v in raw["locations"].items()},
         park={k: tuple(float(c) for c in v) for k, v in raw["park"].items()},
-        conveyor=raw["conveyor"],
         raw=raw,
     )

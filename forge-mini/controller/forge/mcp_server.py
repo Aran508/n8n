@@ -44,11 +44,20 @@ def _machine():
 
 @mcp.tool()
 def describe_cell() -> dict:
-    """Arms, their roles and tools, named locations, the shared zone and reach limits."""
+    """Arms and their roles, tool racks, bits, named locations, shared zones and reach limits.
+
+    Every arm starts with no tool. Use tool_change / bit_change steps; an arm can
+    only use the rack listed for it.
+    """
     return {
-        "arms": {n: {"role": a.role, "tool": a.tool, "base_xy": a.base} for n, a in cell.arms.items()},
+        "arms": {n: {"role": a.role, "base_xy": a.base} for n, a in cell.arms.items()},
+        "tools": {n: {"type": t.type, "rack": t.rack, "reachable_by": cell.racks[t.rack]["arms"], "length_mm": t.length}
+                  for n, t in cell.tools.items()},
+        "bits": {n: {"kind": b.kind, "dia_mm": b.dia, "reachable_by": cell.bit_block["arms"]} for n, b in cell.bits.items()},
+        "tool_actions": {"pick/place": "gripper or vacuum", "hold": "clamp or gripper", "machine": "spindle + bit",
+                         "draw": "pen or glue (path of [dx, dy] offsets)", "probe": "probe"},
         "locations": cell.raw["locations"],
-        "zone": cell.zone,
+        "zones": cell.zones,
         "max_wrist_reach_mm": round(max_reach(cell)),
         "actions": sorted(Planner.ARM_ACTIONS | Planner.CELL_ACTIONS | {"parallel"}),
         "units": "mm, world origin at the centre of the work plate, Z up",
@@ -56,10 +65,11 @@ def describe_cell() -> dict:
 
 
 @mcp.tool()
-def check_reach(arm: str, x: float, y: float, z: float) -> dict:
-    """Can this arm put its tool tip at (x, y, z) pointing down? Returns joint angles or the reason."""
+def check_reach(arm: str, x: float, y: float, z: float, tool: str | None = None) -> dict:
+    """Can this arm put the tip of `tool` (or its bare coupler) at (x, y, z) pointing down?"""
+    l3 = cell.links.coupler + (cell.tools[tool].length if tool else 0)
     try:
-        joints = inverse(cell, cell.arms[arm], (x, y, z), cell.motion["tool_pitch"])
+        joints = inverse(cell, cell.arms[arm], (x, y, z), cell.motion["tool_pitch"], 0, l3)
         return {"reachable": True, "joints": joints}
     except Unreachable as e:
         return {"reachable": False, "reason": str(e)}
@@ -137,12 +147,10 @@ def machine_status() -> dict:
 
 @mcp.tool()
 def stop() -> dict:
-    """Relax every servo and switch off pump and conveyor immediately."""
+    """Relax every servo and switch every tool off immediately."""
     link = _machine()
     if link is None:
         return {"connected": False}
-    link.send({"cmd": "aux", "ch": "pump", "on": False})
-    link.send({"cmd": "aux", "ch": "conveyor", "on": False})
     link.send({"cmd": "relax"})
     return {"ok": True}
 

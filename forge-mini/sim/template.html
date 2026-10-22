@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: workbench. A 3D viewport with the week's build card beside it, then the arm drawing sheet and wiring notes below. */
+/* Layout: workbench. A 3D viewport with the week's build card beside it, then the tool set, the coupler and arm drawing sheets, and the software stack. */
 :root {
   --bg: #eef1f4;
   --surface: #ffffff;
@@ -20,7 +20,11 @@
   --board: #c3cbd3;
   --plate: #f5f7f9;
   --metal: #8b96a1;
+  --steel: #b8c1ca;
   --servo: #2b3540;
+  --toolbody: #d9dee3;
+  --ink-pen: #1d4ed8;
+  --part: #f0c34a;
   --arm1: #d98324;
   --arm2: #2f7dc0;
   --arm3: #7a5bc6;
@@ -38,7 +42,8 @@
   :root:not([data-theme="light"]) {
     --bg: #10151b; --surface: #171f28; --sunken: #0c1116; --ink: #e3e9ef; --muted: #95a2af; --line: #2a3541;
     --accent: #f0763c; --accent-ink: #160c06; --ok: #4cc28a; --bad: #f06a5e;
-    --scene: #0d1217; --board: #26303b; --plate: #364350; --metal: #6c7884; --servo: #11171d;
+    --scene: #0d1217; --board: #26303b; --plate: #364350; --metal: #6c7884; --steel: #8d99a5; --servo: #11171d;
+    --toolbody: #4a5663; --ink-pen: #6ea0ff; --part: #e0b13a;
     --arm1: #f0a04a; --arm2: #5aa6e8; --arm3: #a58af0; --arm4: #45c4b4;
     color-scheme: dark;
   }
@@ -46,7 +51,8 @@
 :root[data-theme="dark"] {
   --bg: #10151b; --surface: #171f28; --sunken: #0c1116; --ink: #e3e9ef; --muted: #95a2af; --line: #2a3541;
   --accent: #f0763c; --accent-ink: #160c06; --ok: #4cc28a; --bad: #f06a5e;
-  --scene: #0d1217; --board: #26303b; --plate: #364350; --metal: #6c7884; --servo: #11171d;
+  --scene: #0d1217; --board: #26303b; --plate: #364350; --metal: #6c7884; --steel: #8d99a5; --servo: #11171d;
+  --toolbody: #4a5663; --ink-pen: #6ea0ff; --part: #e0b13a;
   --arm1: #f0a04a; --arm2: #5aa6e8; --arm3: #a58af0; --arm4: #45c4b4;
   color-scheme: dark;
 }
@@ -65,11 +71,10 @@ p { margin: 0; }
 code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .eyebrow { font-family: var(--font-mono); font-size: var(--step--1); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
-header .lede { max-width: 62ch; color: var(--muted); margin-top: 8px; }
+header .lede { max-width: 64ch; color: var(--muted); margin-top: 8px; }
 .spec { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: var(--step--1); color: var(--muted); }
 .spec b { color: var(--ink); font-weight: 500; }
 
-/* week tabs */
 .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .tab {
   font: inherit; text-align: left; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
@@ -81,15 +86,15 @@ header .lede { max-width: 62ch; color: var(--muted); margin-top: 8px; }
 .tab[aria-selected="true"] .wk { color: var(--accent); }
 .tab:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* main bench */
 .bench { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .viewport { position: relative; border-radius: 10px; overflow: hidden; background: var(--scene); border: 1px solid var(--line); }
-.viewport canvas { display: block; width: 100%; height: clamp(340px, 58vh, 620px); touch-action: none; }
+.viewport canvas { display: block; width: 100%; height: clamp(360px, 62vh, 660px); touch-action: none; }
 .hud { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
 .chip {
   font-family: var(--font-mono); font-size: 12px; padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 1px solid var(--line); color: var(--ink); white-space: nowrap;
+  border: 1px solid var(--line); color: var(--ink); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
 }
+.chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .chip.ok { border-color: var(--ok); color: var(--ok); }
 .chip.bad { border-color: var(--bad); color: var(--bad); }
 .chip.live { border-color: var(--accent); color: var(--accent); }
@@ -112,7 +117,6 @@ header .lede { max-width: 62ch; color: var(--muted); margin-top: 8px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
-/* guide card */
 .guide { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .guide .goal { color: var(--muted); }
 .guide h4 { margin: 0 0 6px; font-family: var(--font-mono); font-size: var(--step--1); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
@@ -126,6 +130,7 @@ header .lede { max-width: 62ch; color: var(--muted); margin-top: 8px; }
 }
 .steps button .t { font-family: var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .steps button:hover { background: var(--sunken); }
+.steps button:focus-visible { outline: 2px solid var(--accent); }
 .steps button[aria-current="step"] { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .steps button[aria-current="step"] .t { color: var(--accent); }
 pre {
@@ -141,10 +146,12 @@ pre {
 .msg.tool code { white-space: pre-wrap; word-break: break-word; }
 .msg .res-bad { color: var(--bad); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; }
 .msg .res-ok { color: var(--ok); font-family: var(--font-mono); font-size: 12px; }
+.flow { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.flow td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.flow td:first-child { white-space: nowrap; font-weight: 600; }
 
-/* sheets below */
 .sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
-.sheet-head { display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+.sheet-head { display: flex; flex-direction: column; gap: 6px; max-width: 72ch; }
 .sheet-head p { color: var(--muted); }
 .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .drawing { width: 100%; max-width: 100%; height: auto; display: block; background: var(--sunken); border-radius: 8px; }
@@ -152,6 +159,9 @@ pre {
 .drawing .dim { stroke: var(--muted); stroke-width: 1; fill: none; }
 .drawing .plate { stroke: var(--metal); stroke-width: 3; }
 .drawing .jt { fill: var(--surface); stroke: var(--accent); stroke-width: 3; }
+.drawing .part { fill: var(--toolbody); stroke: var(--ink); stroke-width: 1.2; }
+.drawing .hot { fill: var(--accent); }
+.drawing .steelf { fill: var(--steel); stroke: var(--ink); stroke-width: 1; }
 .drawing text { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
 .drawing text.k { fill: var(--ink); font-weight: 500; }
 .tablewrap { overflow-x: auto; }
@@ -166,7 +176,18 @@ td.num { font-family: var(--font-mono); text-align: right; }
 .fact { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
 .fact .v { font-family: var(--font-display); font-stretch: 110%; font-weight: 700; font-size: var(--step-2); font-variant-numeric: tabular-nums; }
 .fact .l { font-size: var(--step--1); color: var(--muted); }
-.layers { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.toolgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.toolcard { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.toolcard .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.toolcard .nm { font-family: var(--font-display); font-stretch: 105%; font-weight: 700; }
+.toolcard .rk { font-family: var(--font-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.toolcard p { font-size: var(--step--1); color: var(--muted); }
+.toolcard .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); }
+.bitrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.bitchip { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: var(--step--1); display: flex; flex-direction: column; min-width: 120px; }
+.bitchip b { font-family: var(--font-mono); font-weight: 500; }
+.bitchip span { color: var(--muted); font-size: 12px; }
+.layers { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .layer { display: grid; grid-template-columns: 180px minmax(0, 1fr) minmax(0, 220px); gap: 16px; padding: 12px 14px; border-top: 1px solid var(--line); align-items: start; }
 .layer:first-child { border-top: 0; }
 .layer .nm { font-family: var(--font-display); font-stretch: 105%; font-weight: 700; }
@@ -185,18 +206,17 @@ td.num { font-family: var(--font-mono); text-align: right; }
   .steplabel { font-size: var(--step-0); bottom: 60px; }
   .transport .time { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 </style>
 
 <div class="wrap">
   <header>
     <div>
-      <div class="eyebrow">Prototype · 4 servo arms · 300 × 300 mm base</div>
+      <div class="eyebrow">Prototype · 4 servo arms · automatic tool changers</div>
       <h1>Forge Mini Build Lab</h1>
-      <p class="lede">The four-week build, simulated. Each week plays a real recipe through the same planner and inverse kinematics the machine will use, so every move you see is reachable, inside joint limits and collision-checked.</p>
+      <p class="lede">Four arms share two tool racks and a reamer and bit block. Every arm can swap its end effector on its own, so one small cell can hold, ream, chamfer, press, probe and mark a part. Each week below plays a real recipe through the planner and inverse kinematics the machine will use.</p>
     </div>
     <div class="spec">
-      <span>Reach <b>152 mm</b></span><span>Links <b>55 · 80 · 80 · 45</b></span><span>Servos <b>20</b></span><span>Payload <b>30 g</b></span>
+      <span>Reach <b>152 mm</b></span><span>Tools <b>8</b></span><span>Bits <b>5</b></span><span>Servo channels <b>24</b></span>
     </div>
   </header>
 
@@ -204,7 +224,7 @@ td.num { font-family: var(--font-mono); text-align: right; }
 
   <section class="bench">
     <div>
-      <div class="viewport" id="viewport">
+      <div class="viewport">
         <canvas id="scene" aria-label="3D simulation of the Forge Mini cell"></canvas>
         <div class="hud" id="hud"></div>
         <div class="steplabel" id="steplabel"></div>
@@ -214,10 +234,10 @@ td.num { font-family: var(--font-mono); text-align: right; }
           <input type="range" id="scrub" min="0" max="1" step="0.01" value="0" aria-label="Timeline">
           <span class="time" id="time">0.0 s</span>
           <select id="speed" aria-label="Playback speed">
-            <option value="0.5">0.5×</option>
-            <option value="1" selected>1×</option>
-            <option value="2">2×</option>
+            <option value="1">1×</option>
+            <option value="2" selected>2×</option>
             <option value="4">4×</option>
+            <option value="8">8×</option>
           </select>
         </div>
       </div>
@@ -226,11 +246,73 @@ td.num { font-family: var(--font-mono); text-align: right; }
     <aside class="guide" id="guide" aria-live="polite"></aside>
   </section>
 
+  <section class="sheet" id="tools">
+    <div class="sheet-head">
+      <div class="eyebrow">Tool set</div>
+      <h2>Eight tools, two racks, one bit block</h2>
+      <p>Tools hang through holes in a raised shelf, like a reamer stand. Neighbouring arms share a rack: arm 1 and arm 3 use the left one, arm 2 and arm 4 the right one. The spindle picks its cutters from the bit block, so the same tool reams, drills, chamfers or drives screws.</p>
+    </div>
+    <div class="toolgrid" id="toolgrid"></div>
+    <div>
+      <h3 style="margin-bottom:8px">Bit block (arm 2, arm 4)</h3>
+      <div class="bitrow" id="bitrow"></div>
+    </div>
+  </section>
+
+  <section class="sheet" id="coupler">
+    <div class="sheet-head">
+      <div class="eyebrow">Drawing sheet</div>
+      <h2>The tool changer</h2>
+      <p>Every wrist ends in the same coupler, and every tool carries the matching plate. The arm lowers onto a tool in the rack, an SG90 turns a cam to lock it, and the ESP32 reads the tool's ID resistor before the arm leaves the rack. A wrong or missing tool stops the run.</p>
+    </div>
+    <div class="two">
+      <svg class="drawing" viewBox="0 0 420 300" role="img" aria-label="Cross-section of the tool changer coupler">
+        <rect x="120" y="30" width="180" height="56" rx="6" class="part"/>
+        <text x="130" y="24" class="k">Arm side (on the wrist)</text>
+        <rect x="186" y="44" width="48" height="26" rx="3" fill="var(--servo)"/>
+        <text x="194" y="61" style="fill: var(--accent)">SG90</text>
+        <path d="M210 70 v14" stroke="var(--accent)" stroke-width="3"/>
+        <circle cx="146" cy="86" r="8" class="steelf"/><circle cx="274" cy="86" r="8" class="steelf"/>
+        <rect x="246" y="76" width="16" height="10" class="hot"/>
+        <g stroke="var(--ink)" stroke-width="2">
+          <line x1="164" y1="80" x2="164" y2="100"/><line x1="174" y1="80" x2="174" y2="100"/><line x1="184" y1="80" x2="184" y2="100"/><line x1="194" y1="80" x2="194" y2="100"/>
+        </g>
+        <rect x="120" y="100" width="180" height="20" rx="4" class="part"/>
+        <path d="M138 100 l8 -8 l8 8 Z M266 100 l8 -8 l8 8 Z" fill="var(--sunken)" stroke="var(--ink)"/>
+        <rect x="246" y="100" width="16" height="8" fill="var(--steel)"/>
+        <path d="M200 120 h20 v8 h-20 Z" fill="var(--accent)"/>
+        <text x="130" y="140" class="k">Tool side (one per tool)</text>
+        <rect x="186" y="120" width="48" height="120" rx="4" fill="var(--toolbody)" stroke="var(--ink)"/>
+        <text x="190" y="190">tool</text><text x="190" y="204">body</text>
+        <line class="dim" x1="310" y1="86" x2="360" y2="60"/><text x="300" y="54">steel ball in V-groove</text>
+        <line class="dim" x1="262" y1="80" x2="360" y2="86"/><text x="300" y="98">magnet pulls it in</text>
+        <line class="dim" x1="194" y1="96" x2="80" y2="164"/><text x="12" y="178">4 pogo pins:</text><text x="12" y="192">6 V · GND · SIG · ID</text>
+        <line class="dim" x1="210" y1="80" x2="80" y2="60"/><text x="12" y="56">cam latch</text>
+        <line class="dim" x1="210" y1="124" x2="330" y2="160"/><text x="300" y="176">latch hook</text>
+        <line class="dim" x1="234" y1="230" x2="330" y2="230"/><text x="300" y="246">ID resistor inside</text>
+      </svg>
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div class="facts">
+          <div class="fact"><span class="v">±0.05 mm</span><span class="l">repeatability of 3 balls in 3 V-grooves</span></div>
+          <div class="fact"><span class="v">22 mm</span><span class="l">wrist axis to coupler face</span></div>
+          <div class="fact"><span class="v">10 g</span><span class="l">coupler on the arm, with magnets</span></div>
+        </div>
+        <ol class="note" style="margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px">
+          <li>Arm lowers onto the tool with the latch open. The balls drop into the grooves and the magnet pulls the plates flat.</li>
+          <li>The latch servo turns 85°, and its hook locks under the tool plate.</li>
+          <li>The ESP32 reads the ID pin. A gripper reads 1 kΩ, the spindle 10 kΩ, nothing at all reads open.</li>
+          <li>The SIG pin now drives that tool: gripper jaw, pump, spindle speed or glue plunger.</li>
+          <li>To return a tool, the arm lowers it into its slot, opens the latch and lifts away.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
   <section class="sheet" id="arm">
     <div class="sheet-head">
       <div class="eyebrow">Drawing sheet</div>
       <h2>Arm design</h2>
-      <p>All four arms are identical: a base yaw joint, three pitch joints and a tool servo. The tool always points straight down while working, which keeps the inverse kinematics simple and the gripper square to the plate.</p>
+      <p>All four arms are identical: base yaw, shoulder, elbow and wrist, with the tool always pointing straight down. The tool's length becomes the last link, so the kinematics change with every tool change and the planner keeps track.</p>
     </div>
     <div class="two">
       <svg class="drawing" viewBox="0 0 420 330" role="img" aria-label="Side view of one arm with link lengths">
@@ -240,23 +322,22 @@ td.num { font-family: var(--font-mono); text-align: right; }
         <line class="ln" x1="60" y1="300" x2="60" y2="212" style="stroke: var(--metal)"/>
         <line class="ln" x1="60" y1="212" x2="142.3" y2="113.9" style="stroke: var(--arm2)"/>
         <line class="ln" x1="142.3" y1="113.9" x2="224.6" y2="212" style="stroke: var(--arm2)"/>
-        <line class="ln" x1="224.6" y1="212" x2="224.6" y2="284" style="stroke: var(--arm1)"/>
+        <line class="ln" x1="224.6" y1="212" x2="224.6" y2="232" style="stroke: var(--servo)"/>
+        <rect x="212" y="232" width="25" height="6" fill="var(--accent)"/>
+        <rect x="217" y="238" width="15" height="44" fill="var(--toolbody)" stroke="var(--ink)" stroke-width="1"/>
         <circle class="jt" cx="60" cy="212" r="7"/>
         <circle class="jt" cx="142.3" cy="113.9" r="6"/>
         <circle class="jt" cx="224.6" cy="212" r="5"/>
-        <path d="M216 284 v12 M233 284 v12" stroke="var(--arm1)" stroke-width="3"/>
         <line class="dim" x1="28" y1="300" x2="28" y2="212"/><line class="dim" x1="22" y1="212" x2="34" y2="212"/>
         <text class="k" x="6" y="260">h0</text><text x="4" y="274">55</text>
         <text class="k" x="70" y="150">L1 80</text>
         <text class="k" x="192" y="150">L2 80</text>
-        <text class="k" x="234" y="252">L3 45</text>
+        <text class="k" x="244" y="226">coupler 22</text>
+        <text class="k" x="244" y="264">+ tool 30–48</text>
         <text x="74" y="208">shoulder · MG996R</text>
-        <text x="150" y="104">elbow · MG90S</text>
-        <text x="234" y="208">wrist · SG90</text>
+        <text x="150" y="104">elbow · MG996R</text>
+        <text x="234" y="206">wrist · MG90S</text>
         <text x="84" y="290">base yaw · MG996R</text>
-        <text x="244" y="296">tool · SG90</text>
-        <path d="M60 212 m22 0 a22 22 0 0 0 -8 -17" class="dim"/>
-        <text x="86" y="200" style="fill: var(--accent)">θ1</text>
         <text x="300" y="40" class="k">Elbow-up pose</text>
         <text x="300" y="56">tool pitch = −90°</text>
         <text x="300" y="72">θ1 + θ2 + θ3 = −90°</text>
@@ -264,20 +345,20 @@ td.num { font-family: var(--font-mono); text-align: right; }
       <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
         <div class="facts">
           <div class="fact"><span class="v">152 mm</span><span class="l">max wrist reach (95% of L1+L2)</span></div>
-          <div class="fact"><span class="v">100 mm</span><span class="l">each arm base to plate centre</span></div>
-          <div class="fact"><span class="v">±45 mm</span><span class="l">shared centre zone, 2 arms max</span></div>
+          <div class="fact"><span class="v">3.4 N</span><span class="l">downward feed force at the fixture, enough for reaming plastic</span></div>
+          <div class="fact"><span class="v">≤ 20%</span><span class="l">worst servo load with any of the 8 tools</span></div>
         </div>
         <div class="tablewrap">
           <table>
             <thead><tr><th>Joint</th><th>Servo</th><th style="text-align:right">Needs</th><th style="text-align:right">Stall</th><th>Load vs 50% limit</th></tr></thead>
             <tbody>
-              <tr><td>Shoulder</td><td>MG996R</td><td class="num">1.26 kg·cm</td><td class="num">11.0</td><td><div class="bar" title="11% of stall"><i style="width:11%"></i><b></b></div></td></tr>
-              <tr><td>Elbow</td><td>MG90S</td><td class="num">0.63 kg·cm</td><td class="num">2.2</td><td><div class="bar" title="29% of stall"><i style="width:29%"></i><b></b></div></td></tr>
-              <tr><td>Wrist</td><td>SG90</td><td class="num">0.17 kg·cm</td><td class="num">1.8</td><td><div class="bar" title="9% of stall"><i style="width:9%"></i><b></b></div></td></tr>
+              <tr><td>Shoulder</td><td>MG996R</td><td class="num">2.20 kg·cm</td><td class="num">11.0</td><td><div class="bar" title="20% of stall"><i style="width:20%"></i><b></b></div></td></tr>
+              <tr><td>Elbow</td><td>MG996R</td><td class="num">0.99 kg·cm</td><td class="num">11.0</td><td><div class="bar" title="9% of stall"><i style="width:9%"></i><b></b></div></td></tr>
+              <tr><td>Wrist</td><td>MG90S</td><td class="num">0.29 kg·cm</td><td class="num">2.2</td><td><div class="bar" title="13% of stall"><i style="width:13%"></i><b></b></div></td></tr>
             </tbody>
           </table>
         </div>
-        <p class="note">Worst case: arm stretched out flat holding 30 g. Red tick = 50% of stall, the most a hobby servo should hold continuously. An MG90S on the shoulder would sit at 57%, which is why the shoulder and base use MG996Rs. Run <code>forge budget</code> to recompute after changing link lengths.</p>
+        <p class="note">Worst case: arm stretched flat with the coupler, a 22 g gripper and a 30 g part. Red tick = 50% of stall. The tool changer adds weight, so the elbow went up from an MG90S to an MG996R. With the smaller servo, the elbow would sit at 44% and the arm could push down with only 0.7 N, too little to ream.</p>
       </div>
     </div>
   </section>
@@ -286,14 +367,14 @@ td.num { font-family: var(--font-mono); text-align: right; }
     <div class="sheet-head">
       <div class="eyebrow">Software</div>
       <h2>How the code fits together</h2>
-      <p>The AI never drives a motor. It writes a recipe, the planner proves the recipe safe in this simulation, and only then does the ESP32 move servos. The e-stop and watchdog sit underneath everything.</p>
+      <p>The AI never drives a motor. It writes a recipe, the planner proves it safe in this simulation, and only then does the ESP32 move servos. The e-stop and watchdog sit underneath everything.</p>
     </div>
     <div class="layers">
-      <div class="layer"><span class="nm">Claude / GPT</span><span class="what">Writes and fixes recipes through MCP tools: describe_cell, check_reach, plan_recipe, save_recipe, run_recipe (asks you first), stop.</span><span class="files">forge/mcp_server.py</span></div>
-      <div class="layer"><span class="nm">Recipe planner</span><span class="what">Turns steps like pick, place, hold, press and inspect into straight-line moves, checks reach and joint limits for every 20 mm waypoint, and rejects plans where more than two arms share the centre zone.</span><span class="files">forge/planner.py<br>recipes/*.yaml</span></div>
-      <div class="layer"><span class="nm">Kinematics</span><span class="what">Inverse kinematics from an (x, y, z) target to five joint angles, then to servo degrees using each arm's calibration trims.</span><span class="files">forge/kinematics.py<br>cell.yaml</span></div>
-      <div class="layer"><span class="nm">Executor + vision</span><span class="what">Plays the timeline over USB serial, waits for the IR sensor, runs camera checks and aborts on a failed inspection.</span><span class="files">forge/executor.py<br>forge/vision.py</span></div>
-      <div class="layer"><span class="nm">ESP32 firmware</span><span class="what">100 Hz servo interpolation on two PCA9685 boards, pump and conveyor, e-stop latch, and a 1.5 s watchdog that freezes the arms if the Pi goes quiet.</span><span class="files">firmware/forge_esp32/</span></div>
+      <div class="layer"><span class="nm">Claude / GPT</span><span class="what">Writes and fixes recipes through MCP tools: describe_cell (lists tools, racks and bits), check_reach, plan_recipe, save_recipe, run_recipe (asks you first), stop.</span><span class="files">forge/mcp_server.py</span></div>
+      <div class="layer"><span class="nm">Recipe planner</span><span class="what">Knows where every tool, bit and part is. Expands tool_change, bit_change, pick, place, hold, machine, draw and probe into straight-line moves. Checks reach for every 20 mm waypoint with the mounted tool's length, and enforces the shared zones.</span><span class="files">forge/planner.py<br>recipes/*.yaml</span></div>
+      <div class="layer"><span class="nm">Kinematics</span><span class="what">Inverse kinematics from an (x, y, z) tool tip to joint angles, using coupler + tool + bit as the last link.</span><span class="files">forge/kinematics.py<br>cell.yaml</span></div>
+      <div class="layer"><span class="nm">Executor + vision</span><span class="what">Plays the timeline over USB serial, checks each tool's ID resistor after every change, confirms probe touches and runs camera checks.</span><span class="files">forge/executor.py<br>forge/vision.py</span></div>
+      <div class="layer"><span class="nm">ESP32 firmware</span><span class="what">100 Hz servo interpolation on 24 channels (6 per arm), tool signal lines, ID reading, e-stop latch and a 1.5 s watchdog that stops arms and spindles.</span><span class="files">firmware/forge_esp32/</span></div>
     </div>
     <div class="fileload">
       <label for="loadjson">Play your own recipe: run <code>forge export my_recipe.yaml -o my.json</code>, then open the file here:</label>
@@ -309,70 +390,77 @@ td.num { font-family: var(--font-mono); text-align: right; }
 <script>
 (() => {
 const DATA = JSON.parse(document.getElementById('forge-data').textContent);
-const ROLE = { arm1: 'Loader', arm2: 'Holder', arm3: 'Tool', arm4: 'Inspect' };
+const CELL = DATA.week3.cell;
+const ROLE = { arm1: 'Assembler', arm2: 'Holder', arm3: 'Loader', arm4: 'Machinist' };
+const TOOL_INFO = {
+  gripper: 'Two-jaw gripper on its own SG90. Picks parts, pins and plates.',
+  vacuum: 'Suction cup with a micro pump. Lifts flat parts from the kit tray.',
+  pen: 'Spring-loaded fine liner. Marks parts and draws calibration squares.',
+  probe: 'Touch probe with a normally-closed switch. Measures heights to ±0.1 mm.',
+  clamp: 'Rubber pad. Holds the part down while others work on it.',
+  spindle: 'N20 motor at 1000 rpm with a magnetic V-collet. Takes bits from the bit block.',
+  dispenser: 'Syringe with a servo plunger. Lays glue beads along a path.',
+};
+const BIT_INFO = { reamer: 'finishes a pilot hole to exact size', drill: 'drills a new hole', countersink: 'chamfers a hole edge', hex_driver: 'drives M2 screws' };
 
 const STAGES = [
   {
-    id: 'week1', wk: 'Week 1', name: 'One arm on the bench', data: DATA.week1, show: { conveyor: false, camera: false, zone: false, trays: false },
+    id: 'week1', wk: 'Week 1', name: 'One arm, first tool changes', data: DATA.week1, show: { arms: ['arm1'], racks: ['rack_L'], bits: false, trays: false, pads: true },
     html: () => `
-      <div><div class="eyebrow">Week 1 of 4</div><h2>One arm on the bench</h2></div>
-      <p class="goal">Prove that one arm goes exactly where the code says. Everything later depends on this.</p>
+      <div><div class="eyebrow">Week 1 of 4</div><h2>One arm, first tool changes</h2></div>
+      <p class="goal">Prove that one arm goes where the code says, and that the coupler locks, reports and releases a tool every time.</p>
       <div><h4>Build</h4><ul>
-        <li>Print the base turret and three links (55 / 80 / 80 / 45 mm).</li>
-        <li>Servos: 2× MG996R (base, shoulder), 1× MG90S (elbow), 2× SG90 (wrist, gripper).</li>
-        <li>ESP32 + PCA9685 at 0x40, a 6 V 10 A supply for the servos and the e-stop button in series with it.</li>
+        <li>One arm: MG996R base, shoulder and elbow; MG90S wrist.</li>
+        <li>Coupler on the wrist (3 balls, magnet, SG90 cam latch, 4 pogo pins) and a coupler plate on each tool.</li>
+        <li>Left rack with gripper, vacuum, pen and probe.</li>
+        <li>ESP32 + PCA9685 at 0x40, a 6 V 10 A servo supply, the e-stop in series.</li>
       </ul></div>
       <div><h4>Do</h4><ol>
-        <li>Flash <code>firmware/forge_esp32</code>. Send <code>{"cmd":"move","arm":1,"servo":[90,90,90,90,90],"ms":500}</code> and fit the servo horns at 90°.</li>
-        <li>Run <code>forge budget</code> to check reach and torque for your link lengths.</li>
-        <li>Run the calibration sweep. Where a joint is off, write the error into <code>trims.arm1</code> in <code>cell.yaml</code>.</li>
-        <li>Move the block between the two pads and measure with a ruler.</li>
+        <li>Flash <code>firmware/forge_esp32</code>. Fit the servo horns at 90°.</li>
+        <li>Plug each tool in by hand and send <code>{"cmd":"status"}</code>. Check that <code>tool_ohms</code> shows its ID resistor.</li>
+        <li>Run <code>week1_single_arm.yaml</code>: calibration sweep, gripper on, block move, pen on, 40 mm square.</li>
+        <li>Measure the square. If it comes out 39 mm or skewed, adjust <code>trims.arm1</code> in <code>cell.yaml</code>.</li>
       </ol></div>
-      <div><h4>In the simulation</h4><p>Arm 1 rises to its ready pose and sweeps every joint ±20°, then picks the block from pad A, places it on pad B and brings it back.</p></div>
-      <div class="done"><b>Done when</b> the block lands within 2 mm of the pad mark 10 times in a row.</div>
+      <div class="done"><b>Done when</b> 20 tool changes in a row pass the ID check and the square measures 40.0 ± 0.5 mm.</div>
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
   {
-    id: 'week2', wk: 'Week 2', name: 'Four arms, one plate', data: DATA.week2, show: { conveyor: false, camera: false, zone: true, trays: false },
+    id: 'week2', wk: 'Week 2', name: 'Four arms, two racks', data: DATA.week2, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: false, pads: true },
     html: () => `
-      <div><div class="eyebrow">Week 2 of 4</div><h2>Four arms, one plate</h2></div>
-      <p class="goal">Run four arms around one work plate without them ever hitting each other.</p>
+      <div><div class="eyebrow">Week 2 of 4</div><h2>Four arms, two racks</h2></div>
+      <p class="goal">Four arms change tools and share the plate without ever touching.</p>
       <div><h4>Build</h4><ul>
-        <li>Three more arms, same parts as week 1.</li>
-        <li>Second PCA9685: bridge the A0 pad so it answers at 0x41 (arm 4 lives there).</li>
-        <li>Base board with the arms on a 100 mm circle and the fixture in the centre.</li>
+        <li>Three more arms. Second PCA9685 at 0x41 (bridge the A0 pad).</li>
+        <li>Right rack with gripper, clamp, spindle and glue.</li>
+        <li>Bit block with the 2.0 and 3.0 mm reamers, a 1.5 mm drill, a 90° countersink and a 1.5 mm hex bit.</li>
       </ul></div>
-      <div><h4>The rule that prevents crashes</h4><p>The centre is a shared zone: a 45 mm cylinder over the fixture that holds at most two arms. Each arm owns its corner. The planner rejects any recipe that breaks this before a servo moves. This is the real message for three arms entering at once:</p></div>
+      <div><h4>The rules that prevent crashes</h4><p>The plate has shared zones. Each rack and each tray admits one arm at a time, and the fixture admits two. The planner rejects any recipe that breaks a zone before a servo moves. This is its real answer when arm 1 and arm 3 both reach into the left rack:</p></div>
       <pre class="err">${esc(DATA.conflict_error)}</pre>
-      <div><h4>In the simulation</h4><p>All four arms calibrate together, then pairs visit the centre. Watch the zone chip: it never goes above 2/2.</p></div>
-      <div class="done"><b>Done when</b> this recipe runs 5 times with no contact, and <code>forge plan recipes/week2_zone_conflict.yaml</code> is rejected.</div>
+      <div><h4>In the simulation</h4><p>All four arms calibrate together, then tool up in pairs (one per rack). Arm 4 loads a drill from the bit block, arm 3 probes the block, and arm 1 moves it.</p></div>
+      <div class="done"><b>Done when</b> this recipe runs 5 times with no contact and every tool ends back in its slot.</div>
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
   {
-    id: 'week3', wk: 'Week 3', name: 'First product', data: DATA.week3, show: { conveyor: true, camera: true, zone: true, trays: true },
+    id: 'week3', wk: 'Week 3', name: 'First product', data: DATA.week3, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
     html: () => `
-      <div><div class="eyebrow">Week 3 of 4</div><h2>First product: LED keychain</h2></div>
-      <p class="goal">A printed housing arrives on the conveyor. The arms fit an LED and a cap, check the result and unload it.</p>
-      <div><h4>Build</h4><ul>
-        <li>Conveyor: N20 motor, belt and two rollers, driven by a DRV8833.</li>
-        <li>IR break-beam at the end of the belt (tells the planner the part has arrived).</li>
-        <li>Overhead USB camera with ArUco markers 0 to 3 on the plate corners.</li>
-        <li>Mini vacuum pump on arm 4, and trays for LEDs and caps.</li>
-      </ul></div>
-      <div><h4>Who does what</h4><ul>
-        <li><b style="color:var(--arm1)">Arm 1 Loader</b> moves the housing and the cap.</li>
-        <li><b style="color:var(--arm2)">Arm 2 Holder</b> clamps the housing while others work.</li>
-        <li><b style="color:var(--arm3)">Arm 3 Tool</b> presses the cap home.</li>
-        <li><b style="color:var(--arm4)">Arm 4 Inspect</b> places the LED by vacuum, checks it and unloads.</li>
-      </ul></div>
-      <div class="done"><b>Done when</b> 10 keychains in a row pass the inspection step.</div>
+      <div><div class="eyebrow">Week 3 of 4</div><h2>First product: doweled bracket</h2></div>
+      <p class="goal">Put a printed plate in the kit tray and two 2 mm dowel pins in the cup. The cell finishes the part and puts it in the finished tray.</p>
+      <div><h4>Why ream?</h4><p>Printed holes come out a little undersize and rough. The plate is printed with 1.8 mm pilot holes, and the reamer takes off only 0.1 mm per side, which gives an exact 2.0 mm hole for a tight press fit. The cut is light, so a small arm can do it.</p></div>
+      <div><h4>Who does what</h4>
+      <table class="flow"><tbody>
+        <tr><td style="color:var(--arm3)">Arm 3 Loader</td><td>vacuum: plate from kit tray to fixture → probe: pin heights → pen: mark the part</td></tr>
+        <tr><td style="color:var(--arm2)">Arm 2 Holder</td><td>clamp: holds the plate down during reaming and pressing</td></tr>
+        <tr><td style="color:var(--arm4)">Arm 4 Machinist</td><td>spindle + 2.0 mm reamer on both holes → swap to countersink → chamfer</td></tr>
+        <tr><td style="color:var(--arm1)">Arm 1 Assembler</td><td>gripper: press both pins in → move the bracket to the finished tray</td></tr>
+      </tbody></table></div>
+      <div class="done"><b>Done when</b> 10 brackets in a row probe at 9.0 ± 0.3 mm pin height and a 2.0 mm gauge pin slides into a spare reamed hole.</div>
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
   {
-    id: 'week4', wk: 'Week 4', name: 'Claude takes the controls', data: DATA.week3, show: { conveyor: true, camera: true, zone: true, trays: true },
+    id: 'week4', wk: 'Week 4', name: 'Claude takes the controls', data: DATA.week3, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: false },
     html: () => `
       <div><div class="eyebrow">Week 4 of 4</div><h2>Claude takes the controls</h2></div>
-      <p class="goal">Connect the machine to Claude through MCP. Claude writes the recipe, the planner checks it, you approve, the arms build.</p>
+      <p class="goal">Connect the machine to Claude through MCP. Claude writes the recipe, picks the tools, the planner checks it, you approve, the arms build.</p>
       <div><h4>Set up</h4><ol>
         <li>On the Pi: <code>pip install -e "controller[hardware,mcp]"</code></li>
         <li>Add the server to your Claude config:</li>
@@ -380,15 +468,16 @@ const STAGES = [
       <pre>${esc(JSON.stringify({ mcpServers: { 'forge-mini': { command: 'python', args: ['-m', 'forge.mcp_server'], env: { FORGE_PORT: '/dev/ttyUSB0' } } } }, null, 2))}</pre>
       <div><h4>A real session (errors are the planner's actual output)</h4>
       <div class="chat">
-        <div class="msg user"><span class="who">You</span>Build me an LED keychain and put it in the output tray.</div>
-        <div class="msg tool"><span class="who">Claude → plan_recipe</span><code>ai_first_draft.yaml: … step 12: place {arm: arm3, to: output}</code><span class="res-bad">${esc(DATA.draft_error)}</span></div>
-        <div class="msg"><span class="who">Claude</span>Arm 3 sits in the far corner from the output tray. Arm 4 is next to it, so I'll have arm 4 unload instead.</div>
-        <div class="msg tool"><span class="who">Claude → save_recipe</span><code>led_keychain.yaml</code><span class="res-ok">ok · 12 steps · ${DATA.week3.duration.toFixed(1)} s</span></div>
-        <div class="msg"><span class="who">Claude</span>The plan is clean and takes ${DATA.week3.duration.toFixed(0)} s. Shall I run it?</div>
+        <div class="msg user"><span class="who">You</span>Ream the two holes in this plate to 2 mm, press in the dowels, check them, mark it and put it in the finished tray.</div>
+        <div class="msg tool"><span class="who">Claude → describe_cell</span><code>8 tools in 2 racks, 5 bits, 4 arms</code></div>
+        <div class="msg tool"><span class="who">Claude → plan_recipe</span><code>ai_first_draft.yaml: … tool_change: {arm: arm2, tool: pen}</code><span class="res-bad">${esc(DATA.draft_error)}</span></div>
+        <div class="msg"><span class="who">Claude</span>The pen hangs in the left rack, and arm 2 works from the right side. Arm 3 is free by then and next to that rack, so I'll give the marking to arm 3.</div>
+        <div class="msg tool"><span class="who">Claude → save_recipe</span><code>doweled_bracket.yaml</code><span class="res-ok">ok · ${DATA.week3.steps} steps · ${DATA.week3.duration.toFixed(0)} s · 6 tool changes · 2 bit changes</span></div>
+        <div class="msg"><span class="who">Claude</span>The plan is clean. Make sure the plate is in the kit tray and both pins are in the cup. Shall I start?</div>
         <div class="msg user"><span class="who">You</span>Yes, go.</div>
-        <div class="msg tool"><span class="who">Claude → run_recipe</span><code>name: led_keychain, confirm: true</code><span class="res-ok">running, playing in the viewport</span></div>
+        <div class="msg tool"><span class="who">Claude → run_recipe</span><code>name: doweled_bracket, confirm: true</code><span class="res-ok">running, playing in the viewport</span></div>
       </div></div>
-      <div class="done"><b>Safety rules:</b> Claude only submits recipes. Every recipe is planned first, nothing runs without confirm, and the hardware e-stop cannot be overridden by software.</div>
+      <div class="done"><b>Safety rules:</b> Claude only submits recipes. Every recipe is planned first, nothing runs without confirm, every tool change is checked by its ID resistor, and the hardware e-stop cannot be overridden by software.</div>
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
 ];
@@ -398,6 +487,17 @@ function css(name) { return getComputedStyle(document.documentElement).getProper
 const rad = d => d * Math.PI / 180;
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);   // cell mm (Z up) -> three.js (Y up)
 
+// ---------- static sheets ----------
+(function renderToolSheet() {
+  const racks = CELL.racks;
+  document.getElementById('toolgrid').innerHTML = Object.entries(CELL.tools).map(([n, t]) => `
+    <div class="toolcard"><div class="top"><span class="nm">${esc(n)}</span><span class="rk">${t.rack === 'rack_L' ? 'left rack' : 'right rack'} · ${racks[t.rack].arms.join(', ')}</span></div>
+    <p>${esc(TOOL_INFO[t.type] || t.type)}</p>
+    <div class="meta"><span>${t.length} mm long</span><span>${t.type}</span></div></div>`).join('');
+  document.getElementById('bitrow').innerHTML = Object.entries(CELL.bits).map(([n, b]) => `
+    <div class="bitchip"><b>${esc(n)}</b><span>Ø${b.dia} ${b.kind.replace('_', ' ')}: ${BIT_INFO[b.kind] || ''}</span></div>`).join('');
+})();
+
 // ---------- scene ----------
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -405,79 +505,85 @@ renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(38, 1, 1, 4000);
-camera.position.set(250, 300, 360);
+const camera = new THREE.PerspectiveCamera(36, 1, 1, 4000);
+camera.position.set(170, 320, 400);
 const controls = new THREE.OrbitControls(camera, canvas);
-controls.target.set(0, 25, 0);
+controls.target.set(0, 20, 0);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.49;
-controls.minDistance = 180; controls.maxDistance = 1100;
+controls.minDistance = 150; controls.maxDistance = 1100;
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.75));
 const sun = new THREE.DirectionalLight(0xffffff, 0.75);
-sun.position.set(180, 420, 160);
+sun.position.set(160, 420, 200);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
-Object.assign(sun.shadow.camera, { left: -220, right: 220, top: 220, bottom: -220, near: 50, far: 900 });
+Object.assign(sun.shadow.camera, { left: -230, right: 230, top: 230, bottom: -230, near: 50, far: 900 });
 scene.add(sun);
 
-const M = {}; // theme-tracked materials
-function mat(key, opts = {}) { const m = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.05, ...opts }); m.userData.key = key; (M[key] ||= []).push(m); return m; }
-function box(w, h, d, m, x = 0, y = 0, z = 0) { const g = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); g.position.set(x, y, z); g.castShadow = g.receiveShadow = true; return g; }
-function cyl(r, h, m, seg = 24) { const g = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m); g.castShadow = g.receiveShadow = true; return g; }
+const M = {};
+function track(key, m) { m.userData.key = key; (M[key] ||= []).push(m); return m; }
+function mat(key, opts = {}) { return track(key, new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.05, ...opts })); }
+function basic(key, opts = {}) { return track(key, new THREE.MeshBasicMaterial(opts)); }
+function shade(o) { o.traverse(c => { if (c.isMesh) c.castShadow = c.receiveShadow = true; }); return o; }
+function box(w, h, d, m, x = 0, y = 0, z = 0) { const g = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); g.position.set(x, y, z); return shade(g); }
+function cyl(r, h, m, seg = 24, r2 = r) { return shade(new THREE.Mesh(new THREE.CylinderGeometry(r, r2, h, seg), m)); }
+function along(mesh, x0, len) { mesh.rotation.z = Math.PI / 2; mesh.position.x = x0 + len / 2; return mesh; } // cylinder along +x
 
 const BOARD_TOP = -13;
 const world = new THREE.Group(); scene.add(world);
-world.add(box(330, 8, 330, mat('--board'), 0, BOARD_TOP - 4, 0));
+world.add(box(340, 8, 340, mat('--board'), 0, BOARD_TOP - 4, 0));
+const DOWN = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -Math.PI / 2)); // local +x -> world down
 
-// fixture: pocket floor at -6, walls up to 0
-const fixture = new THREE.Group(); world.add(fixture);
-fixture.add(box(46, 7, 46, mat('--plate'), 0, BOARD_TOP + 3.5, 0));
-for (const [x, z, w, d] of [[15, 0, 4, 34], [-15, 0, 4, 34], [0, 15, 26, 4], [0, -15, 26, 4]]) fixture.add(box(w, 6, d, mat('--plate'), x, -3, z));
+// fixture block: plate sits with its top at z=5
+world.add(box(58, 14, 38, mat('--plate'), 0, BOARD_TOP + 7, 0));
 
-// calibration pads
-const pads = new THREE.Group(); world.add(pads);
-for (const k of ['cal_a', 'cal_b']) {
-  const [x, y] = DATA.week1.cell.locations[k];
-  const p = box(20, 1, 20, mat('--accent', { roughness: 0.9 }), 0, 0, 0); p.position.copy(W(x, y, BOARD_TOP + 0.5)); pads.add(p);
+// racks: shelf at z, posts at the ends, tools hang through
+const rackGroups = {};
+for (const [name, r] of Object.entries(CELL.racks)) {
+  const g = new THREE.Group(); world.add(g); rackGroups[name] = g;
+  const slots = Object.values(CELL.tools).filter(t => t.rack === name).map(t => t.slot);
+  const x = slots[0][0], ys = slots.map(s => s[1]);
+  const y0 = Math.min(...ys) - 14, y1 = Math.max(...ys) + 14;
+  const shelf = box(24, 4, y1 - y0, mat('--metal', { metalness: 0.3 }), 0, 0, 0); shelf.position.copy(W(x, (y0 + y1) / 2, r.z - 2)); g.add(shelf);
+  for (const y of [y0 + 3, y1 - 3]) { const p = box(6, r.z - 4 - BOARD_TOP, 6, mat('--metal', { metalness: 0.3 })); p.position.copy(W(x + (x > 0 ? 9 : -9), y, (r.z - 4 + BOARD_TOP) / 2)); g.add(p); }
 }
+// bit block
+const bitBlock = new THREE.Group(); world.add(bitBlock);
+{ const bs = Object.values(CELL.bits).map(b => b.slot); const x = bs[0][0], ys = bs.map(s => s[1]);
+  const bz = CELL.bit_block.z, y0 = Math.min(...ys) - 8, y1 = Math.max(...ys) + 8;
+  const b = box(16, bz - BOARD_TOP, y1 - y0, mat('--servo')); b.position.copy(W(x, (y0 + y1) / 2, (bz + BOARD_TOP) / 2)); bitBlock.add(b);
+  const bar = box(4, 3, y1 - y0, mat('--steel', { metalness: 0.5 })); bar.position.copy(W(x - 8, (y0 + y1) / 2, bz + 13)); bitBlock.add(bar);
+  for (const s of [y0 + 2, y1 - 2]) { const p = box(4, 13, 4, mat('--steel', { metalness: 0.5 })); p.position.copy(W(x - 8, s, bz + 6)); bitBlock.add(p); } }
 
-// trays
+// trays and pads
 const trays = new THREE.Group(); world.add(trays);
-function tray(loc, top, w) { const [x, y] = DATA.week3.cell.locations[loc]; const h = top - BOARD_TOP; const t = box(w, h, w, mat('--metal'), 0, 0, 0); t.position.copy(W(x, y, BOARD_TOP + h / 2)); trays.add(t); }
-tray('led_tray', -4, 26); tray('cap_tray', 0, 32);
-const out = new THREE.Group(); trays.add(out);
-{ const [x, y] = DATA.week3.cell.locations.output; out.position.copy(W(x, y, 0));
-  out.add(box(42, 1, 42, mat('--metal'), 0, -12.5, 0));
-  for (const [ox, oz, w, d] of [[20, 0, 2, 42], [-20, 0, 2, 42], [0, 20, 42, 2], [0, -20, 42, 2]]) out.add(box(w, 10, d, mat('--metal'), ox, -8, oz)); }
-
-// conveyor
-const conveyor = new THREE.Group(); world.add(conveyor);
-const belt = box(80, 1, 30, mat('--servo', { roughness: 0.95 }), -128, -12.5, 0); conveyor.add(belt);
-for (const x of [-168, -88]) { const r = cyl(5, 34, mat('--metal', { metalness: 0.4 })); r.rotation.x = Math.PI / 2; r.position.set(x, -16, 0); conveyor.add(r); }
-const stripes = [];
-for (let i = 0; i < 8; i++) { const s = box(2, 0.6, 28, mat('--metal'), 0, -11.8, 0); conveyor.add(s); stripes.push(s); }
-const irPosts = [];
-for (const z of [-20, 20]) { const p = box(4, 18, 4, mat('--servo'), -100, -4, z); conveyor.add(p); irPosts.push(p); }
-const beamMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85 });
-const beam = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 36), beamMat); beam.position.set(-100, -2, 0); conveyor.add(beam);
+function trayAt(loc, w, d, top) { const [x, y] = CELL.locations[loc]; const h = top - BOARD_TOP; const t = box(w, h, d, mat('--metal')); t.position.copy(W(x, y, BOARD_TOP + h / 2)); trays.add(t); }
+trayAt('kit.plate', 56, 36, -2); trayAt('finished', 56, 36, -2);
+{ const [x, y] = CELL.locations.pin_cup; const c = cyl(9, 13, mat('--metal'), 24); c.position.copy(W(x, y, BOARD_TOP + 6.5)); trays.add(c); }
+const pads = new THREE.Group(); world.add(pads);
+for (const k of ['cal_a', 'cal_b']) { const [x, y] = CELL.locations[k]; const p = box(20, 1, 20, mat('--accent', { roughness: 0.9 })); p.position.copy(W(x, y, BOARD_TOP + 0.5)); pads.add(p); }
+{ const [x, y] = CELL.locations.cal_square; const p = box(54, 13, 54, mat('--plate', { roughness: 0.95 })); p.position.copy(W(x, y, BOARD_TOP + 6.5)); pads.add(p); }
 
 // overhead camera
 const camRig = new THREE.Group(); world.add(camRig);
-camRig.add(box(8, 300, 8, mat('--metal'), 135, 135, -135));
-const boom = box(200, 6, 6, mat('--metal'), 0, 0, 0); boom.position.set(70, 282, -70); boom.rotation.y = Math.PI / 4; camRig.add(boom);
+camRig.add(box(8, 300, 8, mat('--metal'), -150, 135, -150));
+{ const boom = box(206, 6, 6, mat('--metal')); boom.position.set(-75, 282, -75); boom.rotation.y = -Math.PI / 4; camRig.add(boom); }
 camRig.add(box(22, 14, 22, mat('--servo'), 0, 272, 0));
-const fov = new THREE.Mesh(new THREE.ConeGeometry(70, 250, 4, 1, true), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.025, side: THREE.DoubleSide, depthWrite: false }));
-fov.position.set(0, 140, 0); fov.rotation.y = Math.PI / 4; camRig.add(fov); fov.material.userData.key = '--accent'; (M['--accent'] ||= []).push(fov.material);
 
-// shared zone
-const zoneMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false });
-const zone = new THREE.Mesh(new THREE.CylinderGeometry(45, 45, 120, 48, 1, true), zoneMat); zone.position.set(0, 47, 0); world.add(zone);
-const zoneRing = new THREE.Mesh(new THREE.RingGeometry(44, 45.5, 64), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.7 }));
-zoneRing.rotation.x = -Math.PI / 2; zoneRing.position.y = BOARD_TOP + 0.6; world.add(zoneRing);
+// zones: centre cylinder + rings for the others
+const zoneVis = {};
+for (const [name, z] of Object.entries(CELL.zones)) {
+  const ringMat = basic('--muted', { transparent: true, opacity: 0.55 });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(z.radius - 1, z.radius + 0.6, 64), ringMat);
+  ring.rotation.x = -Math.PI / 2; ring.position.copy(W(z.center[0], z.center[1], BOARD_TOP + 0.6)); world.add(ring);
+  let wall = null;
+  if (name === 'centre') { wall = new THREE.Mesh(new THREE.CylinderGeometry(z.radius, z.radius, 110, 48, 1, true), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false })); wall.position.copy(W(z.center[0], z.center[1], 42)); world.add(wall); }
+  zoneVis[name] = { ring, wall, zone: z };
+}
 
 // ---------- arms ----------
-const L = DATA.week3.cell.links;
+const L = CELL.links;
 const ARMS = {};
 function makeArm(name, spec) {
   const color = mat('--' + name, { roughness: 0.45 });
@@ -489,56 +595,113 @@ function makeArm(name, spec) {
   const colH = L.h0 - (BOARD_TOP + 6) - 16;
   yawG.add(box(14, colH, 26, color, 0, 16 + colH / 2, 0));
   const sh = new THREE.Group(); sh.position.y = L.h0 - (BOARD_TOP + 6); yawG.add(sh);
-  const hub = (r) => { const h = cyl(r, 22, dark); h.rotation.x = Math.PI / 2; return h; };
-  sh.add(hub(9)); sh.add(box(L.L1, 9, 14, color, L.L1 / 2, 0, 0));
+  const hub = r => { const h = cyl(r, 24, dark); h.rotation.x = Math.PI / 2; return h; };
+  sh.add(hub(10)); sh.add(box(L.L1, 10, 15, color, L.L1 / 2, 0, 0));
   const el = new THREE.Group(); el.position.x = L.L1; sh.add(el);
-  el.add(hub(7)); el.add(box(L.L2, 7, 11, color, L.L2 / 2, 0, 0));
+  el.add(hub(9)); el.add(box(L.L2, 8, 12, color, L.L2 / 2, 0, 0));
   const wr = new THREE.Group(); wr.position.x = L.L2; el.add(wr);
-  wr.add(hub(5.5)); wr.add(box(L.L3 - 14, 10, 12, dark, (L.L3 - 14) / 2, 0, 0));
-  const fingers = [];
-  if (spec.tool === 'gripper') {
-    for (const s of [-1, 1]) { const f = box(14, 6, 2.5, color, L.L3 - 7, 0, s * 6); wr.add(f); fingers.push({ m: f, s }); }
-  } else if (spec.tool === 'vacuum') {
-    const n = cyl(2.5, 14, color, 12); n.rotation.z = Math.PI / 2; n.position.x = L.L3 - 7; wr.add(n);
-    const cup = cyl(5, 3, mat('--accent'), 16); cup.rotation.z = Math.PI / 2; cup.position.x = L.L3 - 1.5; wr.add(cup); fingers.push({ cup });
-    const lens = cyl(3, 4, dark, 12); lens.rotation.z = Math.PI / 2; lens.position.set(L.L3 - 18, 0, 9); wr.add(lens);
-  } else {
-    wr.add(box(14, 5, 5, color, L.L3 - 9, 0, 0)); wr.add(box(3, 16, 16, color, L.L3 - 1.5, 0, 0));
-  }
-  const tip = new THREE.Object3D(); tip.position.x = L.L3; wr.add(tip);
-  const insp = new THREE.Mesh(new THREE.ConeGeometry(26, 50, 20, 1, true), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
-  insp.material.userData.key = '--' + name; (M['--' + name] ||= []).push(insp.material);
-  insp.rotation.z = Math.PI / 2; insp.position.x = L.L3 + 25; wr.add(insp);
-  ARMS[name] = { root, yawG, sh, el, wr, tip, fingers, insp, spec };
+  wr.add(hub(6));
+  wr.add(along(cyl(7, L.coupler - 6, dark, 20), 0, L.coupler - 6));
+  const latch = along(cyl(10, 4, mat('--accent'), 6), L.coupler - 6, 4); wr.add(latch);
+  wr.add(along(cyl(10, 2, mat('--steel', { metalness: 0.5 }), 24), L.coupler - 2, 2));
+  const flange = new THREE.Object3D(); flange.position.x = L.coupler; wr.add(flange);
+  ARMS[name] = { root, yawG, sh, el, wr, latch, flange, spec };
 }
-for (const [name, spec] of Object.entries(DATA.week3.cell.arms)) makeArm(name, spec);
-
+for (const [name, spec] of Object.entries(CELL.arms)) makeArm(name, spec);
 function pose(arm, j) {
   arm.yawG.rotation.y = rad(j[0]); arm.sh.rotation.z = rad(j[1]); arm.el.rotation.z = rad(j[2]); arm.wr.rotation.z = rad(j[3]);
-  for (const f of arm.fingers) if (f.m) { const open = THREE.MathUtils.clamp((95 - j[4]) / 75, 0, 1); f.m.position.z = f.s * (3.2 + 6 * open); }
+  arm.latch.rotation.x = rad(j[4]);
 }
 
-// ---------- items ----------
+// ---------- tools and bits (built along local +x from the coupler face) ----------
+const TOOLS = {};
+function makeTool(name, t) {
+  const g = new THREE.Group();
+  const body = mat('--toolbody', { roughness: 0.4 });
+  const steel = mat('--steel', { metalness: 0.6, roughness: 0.35 });
+  g.add(along(cyl(10, 3, mat('--steel', { metalness: 0.5 }), 24), 0, 3));
+  const len = t.length, parts = {};
+  if (t.type === 'gripper') {
+    g.add(box(len - 16, 14, 18, body, 3 + (len - 19) / 2, 0, 0));
+    parts.fingers = [-1, 1].map(s => { const f = box(14, 6, 3, mat('--servo'), len - 7, 0, s * 8); g.add(f); return { m: f, s }; });
+  } else if (t.type === 'vacuum') {
+    g.add(along(cyl(6, len - 9, body, 18), 3, len - 9));
+    parts.cup = along(cyl(2.5, 6, mat('--servo'), 18, 6), len - 6, 6); g.add(parts.cup);
+  } else if (t.type === 'pen') {
+    g.add(along(cyl(4, len - 9, mat('--ink-pen'), 16), 3, len - 9));
+    g.add(along(cyl(0.6, 6, mat('--servo'), 10, 3), len - 6, 6));
+  } else if (t.type === 'probe') {
+    g.add(along(cyl(5, len - 18, body, 16), 3, len - 18));
+    g.add(along(cyl(0.9, 14, steel, 8), len - 15, 14));
+    parts.ball = new THREE.Mesh(new THREE.SphereGeometry(1.8, 14, 10), mat('--bad', { roughness: 0.2 })); parts.ball.position.x = len - 1.5; g.add(parts.ball);
+  } else if (t.type === 'clamp') {
+    g.add(along(cyl(5, len - 7, body, 16), 3, len - 7));
+    g.add(box(4, 18, 18, mat('--servo', { roughness: 0.95 }), len - 2, 0, 0));
+  } else if (t.type === 'spindle') {
+    g.add(along(cyl(9, 22, mat('--servo'), 20), 3, 22));
+    parts.spin = new THREE.Group(); parts.spin.position.x = 25; g.add(parts.spin);
+    parts.spin.add(along(cyl(3.5, len - 25, steel, 12), 0, len - 25));
+    parts.spin.add(box(len - 25, 1, 8, steel, (len - 25) / 2, 0, 0));
+  } else if (t.type === 'dispenser') {
+    g.add(along(cyl(6, len - 14, mat('--plate', { transparent: true, opacity: 0.85 }), 18), 3, len - 14));
+    g.add(along(cyl(0.7, 11, steel, 8, 0.5), len - 11, 11));
+  }
+  const tip = new THREE.Object3D(); tip.position.x = len; g.add(tip);
+  world.add(g);
+  TOOLS[name] = { g, t, tip, parts };
+}
+for (const [n, t] of Object.entries(CELL.tools)) makeTool(n, t);
+
+const BITS = {};
+const BIT_COLORS = { reamer: '--steel', drill: '--part', countersink: '--accent', hex_driver: '--servo' };
+for (const [n, b] of Object.entries(CELL.bits)) {
+  const g = new THREE.Group();
+  g.add(along(cyl(1.6, 6, mat('--steel', { metalness: 0.6 }), 10), 0, 6));
+  g.add(along(cyl(2.6, 1.5, mat(BIT_COLORS[b.kind]), 12), 6, 1.5));
+  if (b.kind === 'countersink') g.add(along(cyl(b.dia / 2, b.stickout - 7.5, mat('--steel', { metalness: 0.6 }), 12, 0.3), 7.5, b.stickout - 7.5));
+  else g.add(along(cyl(b.dia / 2, b.stickout - 7.5, mat(BIT_COLORS[b.kind], { metalness: 0.6 }), 10), 7.5, b.stickout - 7.5));
+  const tip = new THREE.Object3D(); tip.position.x = b.stickout; g.add(tip);
+  world.add(g); BITS[n] = { g, b, tip };
+}
+
+// ---------- parts ----------
 const ITEM_SPECS = {
-  block:   { h: 12, make: () => box(14, 12, 14, mat('--accent', { roughness: 0.5 })) },
-  housing: { h: 12, make: () => box(24, 12, 24, mat('--plate', { roughness: 0.4 })) },
-  led:     { h: 8,  make: () => { const g = new THREE.Group(); const b = cyl(3, 6, mat('--surface-led', { emissive: 0xff5a1f, emissiveIntensity: 0.35, color: 0xff7a3d }), 14); b.position.y = -1; g.add(b); const d = new THREE.Mesh(new THREE.SphereGeometry(3, 14, 10), b.material); d.position.y = 2; g.add(d); return g; } },
-  cap:     { h: 4,  make: () => box(26, 4, 26, new THREE.MeshStandardMaterial({ color: 0xbfd7ff, transparent: true, opacity: 0.55, roughness: 0.2 })) },
+  block: { h: 12, make: () => box(14, 12, 14, mat('--accent', { roughness: 0.5 })) },
+  plate: { h: 4, make: () => { const g = new THREE.Group(); g.add(box(44, 4, 24, mat('--part', { roughness: 0.55 }))); return g; } },
+  pin:   { h: 10, make: () => cyl(1, 10, mat('--steel', { metalness: 0.7, roughness: 0.25 }), 12) },
 };
-let itemMeshes = {};
+let itemMeshes = {}, strokes = [], holes = [];
 function buildItems(data) {
   for (const m of Object.values(itemMeshes)) world.remove(m);
-  itemMeshes = {};
-  for (const e of data.events) if (e.type === 'spawn' || e.type === 'declare') {
+  for (const s of strokes) world.remove(s.mesh);
+  for (const h of holes) world.remove(h.mesh);
+  itemMeshes = {}; strokes = []; holes = [];
+  for (const e of data.events) if (e.type === 'spawn') {
     const spec = ITEM_SPECS[e.data.kind] || ITEM_SPECS.block;
     const inner = spec.make(); inner.position.y = -spec.h / 2;
-    inner.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
     const g = new THREE.Group(); g.add(inner); g.visible = false; world.add(g); itemMeshes[e.data.item] = g;
+  }
+  // marks and holes ride on whatever part they were made on
+  const ownerAt = (t, p) => { const st = itemStates(t, data); let best = null;
+    for (const [n, s] of Object.entries(st)) if (s.mode === 'at' && Math.hypot(s.pos[0] - p[0], s.pos[1] - p[1]) < 26 && Math.abs(s.pos[2] - p[2]) < 3) best = { n, s }; return best; };
+  for (const e of data.events) {
+    if (e.type === 'stroke') {
+      const a = e.data.frm, b = e.data.to, len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const mesh = box(len, 0.4, 1.1, mat(e.data.ink === 'glue' ? '--plate' : '--ink-pen', { roughness: 0.9 }));
+      mesh.geometry.translate(len / 2, 0, 0); mesh.castShadow = false;
+      const o = ownerAt(e.t, a);
+      strokes.push({ e, a, b, len, mesh, owner: o && o.n, off: o ? [a[0] - o.s.pos[0], a[1] - o.s.pos[1], a[2] - o.s.pos[2]] : null }); world.add(mesh);
+    } else if (e.type === 'cut') {
+      const p = e.data.at, r = e.data.kind === 'countersink' ? 1.9 : e.data.dia / 2;
+      const mesh = new THREE.Mesh(new THREE.CircleGeometry(r, 20), basic('--servo')); mesh.rotation.x = -Math.PI / 2;
+      const o = ownerAt(e.t, p);
+      holes.push({ e, p, mesh, owner: o && o.n, off: o ? [p[0] - o.s.pos[0], p[1] - o.s.pos[1], p[2] - o.s.pos[2]] : null }); world.add(mesh);
+    }
   }
 }
 
 // ---------- timeline sampling ----------
-let stage = null, data = null, bySeg = {}, steps = [], t = 0, playing = true, speed = 1, hold = 0;
+let stage = null, data = null, bySeg = {}, steps = [], t = 0, playing = true, speed = 2, hold = 0;
 function index(d) {
   bySeg = {};
   for (const s of d.segments) (bySeg[s.arm] ||= []).push(s);
@@ -553,75 +716,128 @@ function jointsAt(arm, tt) {
   const s = segs[k]; const f = s.dur > 0 ? Math.min(1, (tt - s.t0) / s.dur) : 1;
   return s.start.map((v, i) => v + (s.end[i] - v) * f);
 }
-const tmpV = new THREE.Vector3();
-function tipWorld(name) { ARMS[name].tip.getWorldPosition(tmpV); return tmpV.clone(); }
 
-function itemStates(tt) {
+function itemStates(tt, d = data) {
   const st = {};
-  for (const e of data.events) {
+  for (const e of d.events) {
     if (e.t > tt) break;
-    const d = e.data;
-    if (e.type === 'spawn') st[d.item] = { mode: 'at', pos: d.pos };
-    else if (e.type === 'declare') st[d.item] = { mode: 'hidden' };
-    else if (e.type === 'conveyor') st[d.item] = { mode: 'conv', frm: d.frm, to: d.to, t0: e.t, dur: d.dur };
-    else if (e.type === 'attach') st[d.item] = { mode: 'held', arm: d.arm };
+    const x = e.data;
+    if (e.type === 'spawn') st[x.item] = { mode: 'at', pos: x.pos };
+    else if (e.type === 'attach') st[x.item] = { mode: 'held', arm: x.arm };
     else if (e.type === 'detach') {
-      if (d.into && st[d.into]) { const pp = st[d.into].pos || d.pos; st[d.item] = { mode: 'child', parent: d.into, off: [d.pos[0] - pp[0], d.pos[1] - pp[1], d.pos[2] - pp[2]] }; }
-      else st[d.item] = { mode: 'at', pos: d.pos };
+      if (x.into && st[x.into] && st[x.into].pos) { const pp = st[x.into].pos; st[x.item] = { mode: 'child', parent: x.into, off: [x.pos[0] - pp[0], x.pos[1] - pp[1], x.pos[2] - pp[2]] }; }
+      else st[x.item] = { mode: 'at', pos: x.pos };
     }
   }
   return st;
 }
-function resolve(st, name, tt, depth = 0) {
-  const s = st[name]; if (!s || s.mode === 'hidden' || depth > 4) return null;
+function machineState(tt) {
+  const s = { tool: {}, bit: {}, signal: {}, toolHome: {}, bitHome: {} };
+  for (const e of data.events) {
+    if (e.t > tt) break;
+    const x = e.data;
+    if (e.type === 'tool_attach') { s.tool[x.arm] = x.tool; }
+    else if (e.type === 'tool_detach') { if (s.tool[x.arm] === x.tool) delete s.tool[x.arm]; delete s.signal[x.arm]; }
+    else if (e.type === 'bit_attach') s.bit[x.arm] = x.bit;
+    else if (e.type === 'bit_detach') { if (s.bit[x.arm] === x.bit) delete s.bit[x.arm]; }
+    else if (e.type === 'signal') s.signal[x.arm] = x.state;
+  }
+  return s;
+}
+const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
+
+function tcpOf(arm, ms) {
+  const tool = ms.tool[arm], bit = ms.bit[arm];
+  const o = bit ? BITS[bit].tip : tool ? TOOLS[tool].tip : ARMS[arm].flange;
+  return o.getWorldPosition(new THREE.Vector3());
+}
+function resolveItem(st, ms, name, depth = 0) {
+  const s = st[name]; if (!s || depth > 4) return null;
   if (s.mode === 'at') return W(...s.pos);
-  if (s.mode === 'conv') { const f = Math.min(1, Math.max(0, (tt - s.t0) / s.dur)); return W(...s.frm.map((v, i) => v + (s.to[i] - v) * f)); }
-  if (s.mode === 'held') return ARMS[s.arm] && ARMS[s.arm].root.visible ? tipWorld(s.arm) : null;
-  if (s.mode === 'child') { const p = resolve(st, s.parent, tt, depth + 1); return p ? p.clone().add(new THREE.Vector3(s.off[0], s.off[2], -s.off[1])) : null; }
+  if (s.mode === 'held') return ARMS[s.arm] && ARMS[s.arm].root.visible ? tcpOf(s.arm, ms) : null;
+  if (s.mode === 'child') { const p = resolveItem(st, ms, s.parent, depth + 1); return p ? p.clone().add(new THREE.Vector3(s.off[0], s.off[2], -s.off[1])) : null; }
   return null;
 }
 
-// ---------- HUD ----------
+// ---------- update ----------
 const hud = document.getElementById('hud'), stepLabel = document.getElementById('steplabel');
 const scrub = document.getElementById('scrub'), timeEl = document.getElementById('time'), playBtn = document.getElementById('play');
 let lastHud = '';
 function update(tt) {
   for (const [name, arm] of Object.entries(ARMS)) if (arm.root.visible) pose(arm, jointsAt(name, tt));
-  scene.updateMatrixWorld(true);
+  world.updateMatrixWorld(true);
+  const ms = machineState(tt);
 
-  const st = itemStates(tt);
-  for (const [name, mesh] of Object.entries(itemMeshes)) { const p = resolve(st, name, tt); mesh.visible = !!p; if (p) mesh.position.copy(p); }
-
-  const ev = data.events;
-  const convOn = ev.some(e => e.type === 'conveyor' && tt >= e.t && tt <= e.t + e.data.dur);
-  if (stage.show.conveyor) stripes.forEach((s, i) => { s.position.x = -166 + ((i * 10 + (convOn ? tt * 60 : 0)) % 76); });
-  const housing = st.housing, input = DATA.week3.cell.locations.input;
-  const partAtIr = !!(housing && housing.mode === 'conv' && tt >= housing.t0 + housing.dur - 0.25) || !!(housing && housing.mode === 'at' && Math.abs(housing.pos[0] - input[0]) < 3);
-  beamMat.color.set(partAtIr ? css('--ok') : css('--bad'));
-  let pumpOn = false;
-  for (const e of ev) { if (e.t > tt) break; if (e.type === 'pump') pumpOn = e.data.on; }
-  for (const [name, arm] of Object.entries(ARMS)) {
-    const insp = ev.find(e => e.type === 'inspect' && e.data.arm === name && tt >= e.t - 0.8 && tt <= e.t + 0.1);
-    arm.insp.material.opacity = insp ? 0.22 : 0;
+  // tools: on an arm follow its coupler face, otherwise hang in their slot
+  const onArm = Object.fromEntries(Object.entries(ms.tool).map(([a, n]) => [n, a]));
+  for (const [n, T] of Object.entries(TOOLS)) {
+    const a = onArm[n];
+    T.g.visible = stage.show.racks.includes(T.t.rack) || !!a;
+    if (a) { ARMS[a].flange.getWorldPosition(tmpV); ARMS[a].flange.getWorldQuaternion(tmpQ); T.g.position.copy(tmpV); T.g.quaternion.copy(tmpQ); }
+    else { T.g.position.copy(W(T.t.slot[0], T.t.slot[1], CELL.racks[T.t.rack].z)); T.g.quaternion.copy(DOWN); }
+    const sig = a ? ms.signal[a] : null;
+    if (T.parts.fingers) { const open = sig === 'closed' ? 0 : 1; for (const f of T.parts.fingers) f.m.position.z = f.s * (2.8 + 6.5 * open); }
+    if (T.parts.spin) T.parts.spin.rotation.x = (sig === 'slow' || sig === 'fast') ? tt * (sig === 'fast' ? 60 : 25) : 0;
+    T.g.updateMatrixWorld(true);
+  }
+  const bitOn = Object.fromEntries(Object.entries(ms.bit).map(([a, b]) => [b, a]));
+  for (const [n, B] of Object.entries(BITS)) {
+    const a = bitOn[n];
+    B.g.visible = stage.show.bits || !!a;
+    if (a && ms.tool[a]) { TOOLS[ms.tool[a]].tip.getWorldPosition(tmpV); TOOLS[ms.tool[a]].tip.getWorldQuaternion(tmpQ); B.g.position.copy(tmpV); B.g.quaternion.copy(tmpQ); }
+    else { B.g.position.copy(W(B.b.slot[0], B.b.slot[1], CELL.bit_block.z + 8)); B.g.quaternion.copy(DOWN); }
+    B.g.updateMatrixWorld(true);
   }
 
-  const zc = data.cell.zone; let inZone = [];
-  for (const [name, arm] of Object.entries(ARMS)) if (arm.root.visible) { const p = tipWorld(name); if (Math.hypot(p.x - zc.center[0], -p.z - zc.center[1]) <= zc.radius) inZone.push(name); }
-  const over = inZone.length > zc.capacity;
-  zoneMat.color.set(over ? css('--bad') : inZone.length ? css('--accent') : css('--muted'));
-  zoneMat.opacity = inZone.length ? 0.16 : 0.07;
-  zoneRing.material.color.copy(zoneMat.color);
+  const st = itemStates(tt);
+  const itemPos = {};
+  for (const [name, mesh] of Object.entries(itemMeshes)) { const p = resolveItem(st, ms, name); itemPos[name] = p; mesh.visible = !!p; if (p) mesh.position.copy(p); }
+  for (const s of strokes) {
+    const f = Math.max(0, Math.min(1, (tt - s.e.t) / Math.max(s.e.data.dur, 1e-3)));
+    s.mesh.visible = f > 0;
+    if (!s.mesh.visible) continue;
+    const base = s.owner && itemPos[s.owner] ? itemPos[s.owner].clone().add(new THREE.Vector3(s.off[0], s.off[2], -s.off[1])) : W(...s.a);
+    s.mesh.position.copy(base).add(new THREE.Vector3(0, 0.25, 0));
+    s.mesh.rotation.y = Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]);
+    s.mesh.scale.x = Math.max(f, 0.001);
+  }
+  for (const h of holes) {
+    h.mesh.visible = tt >= h.e.t + h.e.data.dur * 0.6;
+    if (!h.mesh.visible) continue;
+    const base = h.owner && itemPos[h.owner] ? itemPos[h.owner].clone().add(new THREE.Vector3(h.off[0], h.off[2], -h.off[1])) : W(...h.p);
+    h.mesh.position.copy(base).add(new THREE.Vector3(0, 0.2, 0));
+  }
+
+  // zones
+  const tcp = {};
+  for (const [name, arm] of Object.entries(ARMS)) if (arm.root.visible) { const p = tcpOf(name, ms); tcp[name] = [p.x, -p.z]; }
+  const occ = {};
+  for (const [zn, v] of Object.entries(zoneVis)) {
+    const inside = Object.entries(tcp).filter(([, p]) => Math.hypot(p[0] - v.zone.center[0], p[1] - v.zone.center[1]) <= v.zone.radius).map(([a]) => a);
+    occ[zn] = inside;
+    const c = inside.length > v.zone.capacity ? css('--bad') : inside.length ? css('--accent') : css('--muted');
+    v.ring.material.color.set(c); v.ring.material.opacity = inside.length ? 0.95 : 0.4;
+    if (v.wall) { v.wall.material.color.set(c); v.wall.material.opacity = inside.length ? 0.14 : 0.05; }
+  }
 
   let cur = null; for (const s of steps) { if (s.t <= tt + 1e-6) cur = s; else break; }
   const chips = [];
-  if (stage.show.zone) chips.push(`<span class="chip ${over ? 'bad' : inZone.length ? 'live' : ''}">Centre zone ${inZone.length}/${zc.capacity}${inZone.length ? ' · ' + inZone.join(', ') : ''}</span>`);
-  if (stage.show.conveyor) chips.push(`<span class="chip ${convOn ? 'live' : ''}">Conveyor ${convOn ? 'running' : 'stopped'}</span>`, `<span class="chip ${partAtIr ? 'ok' : ''}">IR ${partAtIr ? 'part present' : 'clear'}</span>`);
-  if (Object.values(data.cell.arms).some(a => a.tool === 'vacuum') && stage.show.trays) chips.push(`<span class="chip ${pumpOn ? 'live' : ''}">Pump ${pumpOn ? 'on' : 'off'}</span>`);
+  for (const a of Object.keys(ARMS)) if (ARMS[a].root.visible) {
+    const tl = ms.tool[a] ? ms.tool[a] + (ms.bit[a] ? ' + ' + ms.bit[a] : '') : 'no tool';
+    const sig = ms.signal[a]; const live = sig === 'slow' || sig === 'fast' || sig === 'on' || sig === 'push';
+    chips.push(`<span class="chip ${live ? 'live' : ''}"><i style="background:var(--${a})"></i>${a} · ${esc(tl)}${live ? ' · ' + sig : ''}</span>`);
+  }
+  const busyZones = Object.entries(occ).filter(([, v]) => v.length);
+  for (const [zn, v] of busyZones) chips.push(`<span class="chip ${v.length > CELL.zones[zn].capacity ? 'bad' : 'live'}">${zn} ${v.length}/${CELL.zones[zn].capacity}</span>`);
+  const probe = data.events.find(e => e.type === 'probe' && tt >= e.t - 0.1 && tt <= e.t + 0.6);
+  if (probe) chips.push(`<span class="chip ok">probe ${probe.data.measured.toFixed(2)} mm ✓</span>`);
+  const insp = data.events.find(e => e.type === 'inspect' && tt >= e.t && tt <= e.t + 0.8);
+  if (insp) chips.push(`<span class="chip ok">camera: ${esc(insp.data.check)} ✓</span>`);
   const html = chips.join('') + '|' + (cur ? cur.data.index : '');
   if (html !== lastHud) {
     lastHud = html; hud.innerHTML = chips.join('');
     stepLabel.textContent = cur ? `${cur.data.index}. ${cur.data.label}` : '';
-    document.querySelectorAll('#steps button').forEach(b => b.toggleAttribute('aria-current', false));
+    document.querySelectorAll('#steps button').forEach(b => b.removeAttribute('aria-current'));
     if (cur) { const b = document.querySelector(`#steps button[data-i="${cur.data.index}"]`); if (b) b.setAttribute('aria-current', 'step'); }
   }
   scrub.value = tt; timeEl.textContent = `${tt.toFixed(1)} / ${data.duration.toFixed(1)} s`;
@@ -637,13 +853,15 @@ function setStage(s, keepHash) {
   stage = s; data = s.data; index(data); buildItems(data);
   const armsOn = Object.keys(data.cell.arms);
   for (const [name, arm] of Object.entries(ARMS)) arm.root.visible = armsOn.includes(name);
-  conveyor.visible = s.show.conveyor; camRig.visible = s.show.camera; zone.visible = zoneRing.visible = s.show.zone; trays.visible = s.show.trays;
-  pads.visible = !s.show.trays;
+  for (const [n, g] of Object.entries(rackGroups)) g.visible = s.show.racks.includes(n);
+  bitBlock.visible = s.show.bits; trays.visible = s.show.trays; pads.visible = s.show.pads;
+  camRig.visible = armsOn.length > 1;
+  for (const [zn, v] of Object.entries(zoneVis)) { const on = armsOn.length > 1 && (s.show.trays || !['kit_tray', 'back'].includes(zn)); v.ring.visible = on; if (v.wall) v.wall.visible = on; }
   scrub.max = data.duration; t = 0; hold = 0; lastHud = '';
   guide.innerHTML = s.html();
   document.getElementById('steps').innerHTML = steps.map(e => `<li><button type="button" data-i="${e.data.index}" data-t="${e.t}"><span class="t">${e.t.toFixed(1)}s</span><span>${esc(e.data.label)}</span></button></li>`).join('');
   document.querySelectorAll('#steps button').forEach(b => b.onclick = () => { t = +b.dataset.t + 0.01; update(t); });
-  legend.innerHTML = armsOn.map(n => `<span><i style="background:var(--${n})"></i>${n} · ${ROLE[n] || data.cell.arms[n].role} (${data.cell.arms[n].tool})</span>`).join('') + (s.show.zone ? `<span><i style="background:var(--accent);opacity:.5"></i>shared centre zone</span>` : '');
+  legend.innerHTML = armsOn.map(n => `<span><i style="background:var(--${n})"></i>${n} · ${ROLE[n] || data.cell.arms[n].role}</span>`).join('') + (armsOn.length > 1 ? `<span><i style="background:var(--accent);opacity:.6"></i>shared zone in use</span>` : '');
   renderTabs();
   if (!keepHash) try { history.replaceState(null, '', '#' + s.id); } catch (e) {}
   update(0);
@@ -661,14 +879,13 @@ new MutationObserver(applyTheme).observe(document.documentElement, { attributes:
 
 // ---------- loop ----------
 function resize() {
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
+  const w = canvas.clientWidth, h = canvas.clientHeight, pr = renderer.getPixelRatio();
+  if (canvas.width !== Math.floor(w * pr) || canvas.height !== Math.floor(h * pr)) {
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-    if (w < 560) camera.position.set(400, 460, 580);
+    if (w < 560) camera.position.set(240, 470, 600);
   }
 }
 let last = performance.now();
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   resize();
@@ -691,20 +908,18 @@ document.getElementById('loadjson').onchange = async e => {
   const msg = document.getElementById('loadmsg');
   try {
     const d = JSON.parse(await f.text());
-    if (!d.segments || !d.cell) throw new Error('not a forge export');
-    if (!d.cell.arms) throw new Error('missing arms');
-    const custom = { id: 'custom', wk: 'Yours', name: d.product || f.name, data: d, show: { conveyor: d.events.some(x => x.type === 'conveyor'), camera: true, zone: true, trays: true },
+    if (!d.segments || !d.cell || !d.cell.arms || !d.cell.tools) throw new Error('not a forge export from this version');
+    const custom = { id: 'custom', wk: 'Yours', name: d.product || f.name, data: d, show: { arms: null, racks: ['rack_L', 'rack_R'], bits: true, trays: true, pads: true },
       html: () => `<div><div class="eyebrow">Your recipe</div><h2>${esc(d.product || f.name)}</h2></div><p class="goal">Planned by your copy of the controller: ${d.segments.length} moves, ${d.duration.toFixed(1)} s.</p><div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>` };
-    const i = STAGES.findIndex(s => s.id === 'custom'); if (i >= 0) STAGES.splice(i, 1);
     setStage(custom, true);
     msg.textContent = 'Loaded. Playing above.';
   } catch (err) { msg.textContent = 'Could not read that file: ' + err.message; }
 };
 
-const initial = STAGES.find(s => '#' + s.id === location.hash) || STAGES[0];
+const initial = STAGES.find(s => '#' + s.id === location.hash) || STAGES[2];
 applyTheme();
 setStage(initial, true);
-if (reduced) { playing = false; playBtn.textContent = 'Play'; }
+if (matchMedia('(prefers-reduced-motion: reduce)').matches) { playing = false; playBtn.textContent = 'Play'; }
 requestAnimationFrame(frame);
 })();
 </script>

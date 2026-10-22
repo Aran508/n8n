@@ -19,26 +19,26 @@ def load_recipe(path: str) -> dict:
     return yaml.safe_load(Path(path).read_text())
 
 
-def plan_file(cell, path: str):
+def plan_file(cell, path):
     recipe = load_recipe(path)
-    planner = Planner(cell, recipe.get("arms"))
-    initial = {name: list(st.joints) for name, st in planner.state.items()}
-    timeline = planner.plan(recipe)
-    timeline.initial = initial
-    return recipe, timeline
+    return recipe, Planner(cell, recipe.get("arms")).plan(recipe)
 
 
 def export_payload(cell, recipe: dict, timeline) -> dict:
-    """Everything the 3D viewer needs: geometry, layout and the timed motion."""
+    """Everything the 3D viewer needs: geometry, layout, tools and the timed motion."""
+    arms = recipe.get("arms") or list(cell.arms)
     return {
-        "initial": getattr(timeline, "initial", {}),
         "product": recipe.get("product"),
         "cell": {
             "links": cell.raw["links"],
-            "arms": {n: {"base": a.base, "yaw": a.yaw, "tool": a.tool, "role": a.role}
-                     for n, a in cell.arms.items() if n in (recipe.get("arms") or cell.arms)},
-            "zone": cell.zone,
+            "arms": {n: {"base": a.base, "yaw": a.yaw, "role": a.role} for n, a in cell.arms.items() if n in arms},
+            "tools": {n: {"type": t.type, "rack": t.rack, "slot": t.slot, "length": t.length} for n, t in cell.tools.items()},
+            "racks": cell.racks,
+            "bits": {n: {"kind": b.kind, "dia": b.dia, "stickout": b.stickout, "slot": b.slot} for n, b in cell.bits.items()},
+            "bit_block": cell.bit_block,
+            "zones": cell.zones,
             "locations": cell.raw["locations"],
+            "lock": cell.lock,
         },
         **timeline.to_dict(),
     }
@@ -48,12 +48,14 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="forge")
     p.add_argument("--cell", default=None, help="path to cell.yaml")
     sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("budget", help="reach and servo torque check")
+    sub.add_parser("budget", help="reach, servo torque per tool, and reaming feed force")
+    sub.add_parser("tools", help="list the tool racks and the bit block")
     ik = sub.add_parser("ik", help="joint + servo angles for one target")
     ik.add_argument("arm")
     ik.add_argument("x", type=float)
     ik.add_argument("y", type=float)
     ik.add_argument("z", type=float)
+    ik.add_argument("--tool", default=None, help="mounted tool (changes the TCP length)")
     pl = sub.add_parser("plan", help="validate a recipe in the digital twin")
     pl.add_argument("recipe")
     ex = sub.add_parser("export", help="plan and write the timeline JSON for the 3D viewer")
@@ -71,10 +73,22 @@ def main(argv: list[str] | None = None) -> int:
         print(report(cell))
         return 0
 
+    if args.cmd == "tools":
+        for rack, spec in cell.racks.items():
+            print(f"{rack} (arms {', '.join(spec['arms'])}):")
+            for t in cell.tools.values():
+                if t.rack == rack:
+                    print(f"  {t.name:<10} {t.type:<9} {t.length:>4.0f} mm  {t.mass:>3.0f} g  id {t.id_ohms} ohm")
+        print(f"bit block (arms {', '.join(cell.bit_block['arms'])}):")
+        for b in cell.bits.values():
+            print(f"  {b.name:<10} {b.kind:<12} {b.dia:>4.1f} mm  stickout {b.stickout:.0f} mm")
+        return 0
+
     if args.cmd == "ik":
         arm = cell.arms[args.arm]
         try:
-            joints = inverse(cell, arm, (args.x, args.y, args.z), cell.motion["tool_pitch"])
+            l3 = cell.links.coupler + (cell.tools[args.tool].length if args.tool else 0)
+            joints = inverse(cell, arm, (args.x, args.y, args.z), cell.motion["tool_pitch"], 0, l3)
         except Unreachable as e:
             print(f"unreachable: {e}")
             return 1
@@ -113,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             play(cell, timeline, link, inspector)
         finally:
-            link.send({"cmd": "aux", "ch": "pump", "on": False})
+            link.send({"cmd": "relax"})
             link.close()
         return 0
     return 1

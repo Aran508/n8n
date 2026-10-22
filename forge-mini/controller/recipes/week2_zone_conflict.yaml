@@ -1,8 +1,7 @@
-# Deliberately wrong: three arms rush into the centre at once. The zone
-# manager (capacity 2) rejects this plan, which is exactly what we want.
+# Deliberately wrong: arm1 and arm3 both reach into the left rack at once.
+# The rack is a shared zone with capacity 1, so the planner rejects this.
 product: week2_zone_conflict
 steps:
   - parallel:
-      - inspect: {arm: arm1, at: fixture}
-      - inspect: {arm: arm2, at: fixture}
-      - inspect: {arm: arm3, at: fixture}
+      - tool_change: {arm: arm1, tool: gripper_A}
+      - tool_change: {arm: arm3, tool: vacuum}

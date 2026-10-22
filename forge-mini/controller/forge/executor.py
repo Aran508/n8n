@@ -74,59 +74,58 @@ def play(
     inspector: Callable[[dict], bool] | None = None,
     log: Callable[[str], None] = print,
 ) -> None:
-    """Send every segment at its planned time.
+    """Send every segment and tool signal at its planned time.
 
-    Sensor events pause the schedule until the ESP32 reports them, and inspect
-    events call `inspector` (e.g. forge.vision) — a failed check aborts the run.
+    After each tool change the ESP32 reads the tool's ID resistor and the run
+    stops if the wrong tool (or no tool) is on the coupler. Probe events check
+    that the probe really touched, and inspect events call `inspector`
+    (e.g. forge.vision); a failed check aborts the run.
     """
     items = [(s.t0, 0, "move", s) for s in timeline.segments]
     items += [(e.t, 1, "event", e) for e in timeline.events]
     items.sort(key=lambda i: (i[0], i[1]))
 
-    offset = 0.0  # seconds we have slipped behind the plan (waiting on sensors)
+    touched: dict[str, float] = {}
     t_start = time.monotonic()
     for t, _, kind, obj in items:
-        wait = t_start + t + offset - time.monotonic()
+        wait = t_start + t - time.monotonic()
         if wait > 0:
             time.sleep(wait)
-        _check_events(link)
+        _check_events(link, touched)
         if kind == "move":
             link.send({"cmd": "move", "arm": ARM_INDEX[obj.arm], "servo": obj.servos, "ms": int(obj.dur * 1000)})
             continue
-        e = obj
+        e, d = obj, obj.data
         if e.type == "step":
-            log(f"[{t:6.2f}s] step {e.data['index']}: {e.data['label']}")
-        elif e.type == "pump":
-            link.send({"cmd": "aux", "ch": "pump", "on": e.data["on"]})
-        elif e.type == "conveyor":
-            link.send({"cmd": "aux", "ch": "conveyor", "on": True})
-        elif e.type == "sensor":
-            waited = _wait_for_ir(link, timeout=10.0)
-            link.send({"cmd": "aux", "ch": "conveyor", "on": False})
-            offset += waited
+            log(f"[{t:6.2f}s] step {d['index']}: {d['label']}")
+        elif e.type == "signal":
+            link.send({"cmd": "tool", "arm": ARM_INDEX[d["arm"]], "value": d["value"]})
+        elif e.type == "id_check":
+            time.sleep(0.15)  # let the latch settle before reading the ID resistor
+            ohms = link.send({"cmd": "status"})["tool_ohms"][ARM_INDEX[d["arm"]] - 1]
+            if ohms is None or abs(ohms - d["ohms"]) > 0.25 * d["ohms"]:
+                seen = "nothing" if ohms is None else f"{ohms / 1000:.1f} kOhm"
+                raise MachineError(f"{d['arm']} should now hold {d['tool']} ({d['ohms'] / 1000:.1f} kOhm) but reads {seen}; is it seated?")
+        elif e.type == "tool_detach":
+            time.sleep(0.15)
+            if link.send({"cmd": "status"})["tool_ohms"][ARM_INDEX[d["arm"]] - 1] is not None:
+                raise MachineError(f"{d['arm']} released {d['tool']} but it is still on the coupler")
+        elif e.type == "probe":
+            time.sleep(0.2)
+            _check_events(link, touched)
+            if time.monotonic() - touched.get(d["arm"], -1e9) > 1.5:
+                raise MachineError(f"probe on {d['arm']} never touched at {d['at']}: part missing or out of position?")
         elif e.type == "inspect" and inspector is not None:
-            if not inspector(e.data):
-                raise MachineError(f"inspection failed: {e.data.get('check')} at {e.data.get('at')}")
+            if not inspector(d):
+                raise MachineError(f"inspection failed: {d.get('check')} at {d.get('at')}")
     time.sleep(0.5)
-    _check_events(link)
+    _check_events(link, touched)
 
 
-def _check_events(link: SerialLink) -> None:
+def _check_events(link: SerialLink, touched: dict[str, float] | None = None) -> None:
     while not link.events.empty():
         ev = link.events.get()
         if ev["event"] in ("estop", "watchdog"):
             raise MachineError(f"machine stopped: {ev['event']}")
-
-
-def _wait_for_ir(link: SerialLink, timeout: float) -> float:
-    t0 = time.monotonic()
-    while time.monotonic() - t0 < timeout:
-        try:
-            ev = link.events.get(timeout=0.05)
-        except queue.Empty:
-            continue
-        if ev["event"] == "ir" and ev.get("state") == 1:
-            return max(0.0, time.monotonic() - t0)
-        if ev["event"] in ("estop", "watchdog"):
-            raise MachineError(f"machine stopped: {ev['event']}")
-    raise MachineError("part never reached the IR sensor (conveyor jam?)")
+        if ev["event"] == "probe" and touched is not None:
+            touched[f"arm{ev['arm']}"] = time.monotonic()
