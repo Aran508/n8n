@@ -1,0 +1,710 @@
+<title>Forge Mini Build Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: workbench. A 3D viewport with the week's build card beside it, then the arm drawing sheet and wiring notes below. */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --sunken: #e3e8ed;
+  --ink: #16202b;
+  --muted: #566270;
+  --line: #d3dae1;
+  --accent: #cf4a17;
+  --accent-ink: #ffffff;
+  --ok: #23845a;
+  --bad: #c3352b;
+  --scene: #e2e7ec;
+  --board: #c3cbd3;
+  --plate: #f5f7f9;
+  --metal: #8b96a1;
+  --servo: #2b3540;
+  --arm1: #d98324;
+  --arm2: #2f7dc0;
+  --arm3: #7a5bc6;
+  --arm4: #23978a;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.125rem;
+  --step-2: 1.5rem;
+  --step-3: 2.25rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151b; --surface: #171f28; --sunken: #0c1116; --ink: #e3e9ef; --muted: #95a2af; --line: #2a3541;
+    --accent: #f0763c; --accent-ink: #160c06; --ok: #4cc28a; --bad: #f06a5e;
+    --scene: #0d1217; --board: #26303b; --plate: #364350; --metal: #6c7884; --servo: #11171d;
+    --arm1: #f0a04a; --arm2: #5aa6e8; --arm3: #a58af0; --arm4: #45c4b4;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10151b; --surface: #171f28; --sunken: #0c1116; --ink: #e3e9ef; --muted: #95a2af; --line: #2a3541;
+  --accent: #f0763c; --accent-ink: #160c06; --ok: #4cc28a; --bad: #f06a5e;
+  --scene: #0d1217; --board: #26303b; --plate: #364350; --metal: #6c7884; --servo: #11171d;
+  --arm1: #f0a04a; --arm2: #5aa6e8; --arm3: #a58af0; --arm4: #45c4b4;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 64px;
+}
+.wrap { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+h1, h2, h3 { font-family: var(--font-display); font-stretch: 112%; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: var(--step-3); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: var(--step-2); font-weight: 700; }
+h3 { font-size: var(--step-1); font-weight: 700; }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+.eyebrow { font-family: var(--font-mono); font-size: var(--step--1); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
+header .lede { max-width: 62ch; color: var(--muted); margin-top: 8px; }
+.spec { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: var(--step--1); color: var(--muted); }
+.spec b { color: var(--ink); font-weight: 500; }
+
+/* week tabs */
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.tab {
+  font: inherit; text-align: left; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.tab .wk { font-family: var(--font-mono); font-size: var(--step--1); color: var(--muted); }
+.tab .nm { font-family: var(--font-display); font-stretch: 105%; font-weight: 700; font-size: var(--step-0); line-height: 1.25; }
+.tab[aria-selected="true"] { border-color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
+.tab[aria-selected="true"] .wk { color: var(--accent); }
+.tab:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* main bench */
+.bench { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.viewport { position: relative; border-radius: 10px; overflow: hidden; background: var(--scene); border: 1px solid var(--line); }
+.viewport canvas { display: block; width: 100%; height: clamp(340px, 58vh, 620px); touch-action: none; }
+.hud { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.chip {
+  font-family: var(--font-mono); font-size: 12px; padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--line); color: var(--ink); white-space: nowrap;
+}
+.chip.ok { border-color: var(--ok); color: var(--ok); }
+.chip.bad { border-color: var(--bad); color: var(--bad); }
+.chip.live { border-color: var(--accent); color: var(--accent); }
+.steplabel {
+  position: absolute; left: 12px; right: 12px; bottom: 64px; pointer-events: none;
+  font-family: var(--font-display); font-stretch: 105%; font-weight: 700; font-size: var(--step-1); color: var(--ink);
+  text-shadow: 0 1px 0 var(--scene), 0 0 12px var(--scene);
+}
+.transport {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); border-top: 1px solid var(--line);
+}
+.transport button, .transport select {
+  font: inherit; font-size: var(--step--1); border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 5px 10px; cursor: pointer;
+}
+.transport button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 72px; font-weight: 600; }
+.transport input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--accent); }
+.transport .time { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: var(--step--1); color: var(--muted); padding: 10px 2px 0; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* guide card */
+.guide { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.guide .goal { color: var(--muted); }
+.guide h4 { margin: 0 0 6px; font-family: var(--font-mono); font-size: var(--step--1); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.guide ol, .guide ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+.guide li::marker { color: var(--muted); font-family: var(--font-mono); font-size: 0.85em; }
+.done { border-left: 3px solid var(--ok); padding: 6px 0 6px 12px; }
+.done b { color: var(--ok); }
+.steps { list-style: none; padding: 0 !important; gap: 2px !important; }
+.steps button {
+  all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 3.4em 1fr; gap: 8px; width: 100%; padding: 4px 8px; border-radius: 5px; font-size: var(--step--1);
+}
+.steps button .t { font-family: var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.steps button:hover { background: var(--sunken); }
+.steps button[aria-current="step"] { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.steps button[aria-current="step"] .t { color: var(--accent); }
+pre {
+  margin: 0; background: var(--sunken); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto;
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; color: var(--ink);
+}
+.err { border-color: var(--bad); color: var(--bad); white-space: pre-wrap; }
+.chat { display: flex; flex-direction: column; gap: 8px; }
+.msg { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: var(--step--1); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.msg .who { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.msg.user { background: var(--sunken); }
+.msg.tool { border-style: dashed; }
+.msg.tool code { white-space: pre-wrap; word-break: break-word; }
+.msg .res-bad { color: var(--bad); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; }
+.msg .res-ok { color: var(--ok); font-family: var(--font-mono); font-size: 12px; }
+
+/* sheets below */
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.sheet-head { display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+.sheet-head p { color: var(--muted); }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.drawing { width: 100%; max-width: 100%; height: auto; display: block; background: var(--sunken); border-radius: 8px; }
+.drawing .ln { stroke: var(--ink); stroke-width: 7; stroke-linecap: round; fill: none; }
+.drawing .dim { stroke: var(--muted); stroke-width: 1; fill: none; }
+.drawing .plate { stroke: var(--metal); stroke-width: 3; }
+.drawing .jt { fill: var(--surface); stroke: var(--accent); stroke-width: 3; }
+.drawing text { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+.drawing text.k { fill: var(--ink); font-weight: 500; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-family: var(--font-mono); font-weight: 500; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+td.num { font-family: var(--font-mono); text-align: right; }
+.bar { position: relative; height: 10px; background: var(--sunken); border-radius: 3px; min-width: 120px; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ok); border-radius: 3px; }
+.bar b { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--bad); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fact { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.fact .v { font-family: var(--font-display); font-stretch: 110%; font-weight: 700; font-size: var(--step-2); font-variant-numeric: tabular-nums; }
+.fact .l { font-size: var(--step--1); color: var(--muted); }
+.layers { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.layer { display: grid; grid-template-columns: 180px minmax(0, 1fr) minmax(0, 220px); gap: 16px; padding: 12px 14px; border-top: 1px solid var(--line); align-items: start; }
+.layer:first-child { border-top: 0; }
+.layer .nm { font-family: var(--font-display); font-stretch: 105%; font-weight: 700; }
+.layer .what { color: var(--muted); font-size: var(--step--1); }
+.layer .files { font-family: var(--font-mono); font-size: 12px; color: var(--ink); word-break: break-word; }
+.note { font-size: var(--step--1); color: var(--muted); }
+.fileload { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: var(--step--1); color: var(--muted); }
+.fileload input { font: inherit; font-size: var(--step--1); max-width: 100%; }
+
+@media (max-width: 900px) {
+  .bench, .two { grid-template-columns: minmax(0, 1fr); }
+  .layer { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+@media (max-width: 560px) {
+  .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .steplabel { font-size: var(--step-0); bottom: 60px; }
+  .transport .time { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Prototype · 4 servo arms · 300 × 300 mm base</div>
+      <h1>Forge Mini Build Lab</h1>
+      <p class="lede">The four-week build, simulated. Each week plays a real recipe through the same planner and inverse kinematics the machine will use, so every move you see is reachable, inside joint limits and collision-checked.</p>
+    </div>
+    <div class="spec">
+      <span>Reach <b>152 mm</b></span><span>Links <b>55 · 80 · 80 · 45</b></span><span>Servos <b>20</b></span><span>Payload <b>30 g</b></span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Build weeks" id="tabs"></nav>
+
+  <section class="bench">
+    <div>
+      <div class="viewport" id="viewport">
+        <canvas id="scene" aria-label="3D simulation of the Forge Mini cell"></canvas>
+        <div class="hud" id="hud"></div>
+        <div class="steplabel" id="steplabel"></div>
+        <div class="transport">
+          <button class="primary" id="play" type="button">Pause</button>
+          <button id="restart" type="button" aria-label="Restart">↺</button>
+          <input type="range" id="scrub" min="0" max="1" step="0.01" value="0" aria-label="Timeline">
+          <span class="time" id="time">0.0 s</span>
+          <select id="speed" aria-label="Playback speed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <aside class="guide" id="guide" aria-live="polite"></aside>
+  </section>
+
+  <section class="sheet" id="arm">
+    <div class="sheet-head">
+      <div class="eyebrow">Drawing sheet</div>
+      <h2>Arm design</h2>
+      <p>All four arms are identical: a base yaw joint, three pitch joints and a tool servo. The tool always points straight down while working, which keeps the inverse kinematics simple and the gripper square to the plate.</p>
+    </div>
+    <div class="two">
+      <svg class="drawing" viewBox="0 0 420 330" role="img" aria-label="Side view of one arm with link lengths">
+        <line class="plate" x1="20" y1="300" x2="400" y2="300"/>
+        <text x="300" y="318">work plate · z = 0</text>
+        <rect x="44" y="270" width="32" height="30" rx="3" fill="var(--servo)"/>
+        <line class="ln" x1="60" y1="300" x2="60" y2="212" style="stroke: var(--metal)"/>
+        <line class="ln" x1="60" y1="212" x2="142.3" y2="113.9" style="stroke: var(--arm2)"/>
+        <line class="ln" x1="142.3" y1="113.9" x2="224.6" y2="212" style="stroke: var(--arm2)"/>
+        <line class="ln" x1="224.6" y1="212" x2="224.6" y2="284" style="stroke: var(--arm1)"/>
+        <circle class="jt" cx="60" cy="212" r="7"/>
+        <circle class="jt" cx="142.3" cy="113.9" r="6"/>
+        <circle class="jt" cx="224.6" cy="212" r="5"/>
+        <path d="M216 284 v12 M233 284 v12" stroke="var(--arm1)" stroke-width="3"/>
+        <line class="dim" x1="28" y1="300" x2="28" y2="212"/><line class="dim" x1="22" y1="212" x2="34" y2="212"/>
+        <text class="k" x="6" y="260">h0</text><text x="4" y="274">55</text>
+        <text class="k" x="70" y="150">L1 80</text>
+        <text class="k" x="192" y="150">L2 80</text>
+        <text class="k" x="234" y="252">L3 45</text>
+        <text x="74" y="208">shoulder · MG996R</text>
+        <text x="150" y="104">elbow · MG90S</text>
+        <text x="234" y="208">wrist · SG90</text>
+        <text x="84" y="290">base yaw · MG996R</text>
+        <text x="244" y="296">tool · SG90</text>
+        <path d="M60 212 m22 0 a22 22 0 0 0 -8 -17" class="dim"/>
+        <text x="86" y="200" style="fill: var(--accent)">θ1</text>
+        <text x="300" y="40" class="k">Elbow-up pose</text>
+        <text x="300" y="56">tool pitch = −90°</text>
+        <text x="300" y="72">θ1 + θ2 + θ3 = −90°</text>
+      </svg>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="facts">
+          <div class="fact"><span class="v">152 mm</span><span class="l">max wrist reach (95% of L1+L2)</span></div>
+          <div class="fact"><span class="v">100 mm</span><span class="l">each arm base to plate centre</span></div>
+          <div class="fact"><span class="v">±45 mm</span><span class="l">shared centre zone, 2 arms max</span></div>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Joint</th><th>Servo</th><th style="text-align:right">Needs</th><th style="text-align:right">Stall</th><th>Load vs 50% limit</th></tr></thead>
+            <tbody>
+              <tr><td>Shoulder</td><td>MG996R</td><td class="num">1.26 kg·cm</td><td class="num">11.0</td><td><div class="bar" title="11% of stall"><i style="width:11%"></i><b></b></div></td></tr>
+              <tr><td>Elbow</td><td>MG90S</td><td class="num">0.63 kg·cm</td><td class="num">2.2</td><td><div class="bar" title="29% of stall"><i style="width:29%"></i><b></b></div></td></tr>
+              <tr><td>Wrist</td><td>SG90</td><td class="num">0.17 kg·cm</td><td class="num">1.8</td><td><div class="bar" title="9% of stall"><i style="width:9%"></i><b></b></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Worst case: arm stretched out flat holding 30 g. Red tick = 50% of stall, the most a hobby servo should hold continuously. An MG90S on the shoulder would sit at 57%, which is why the shoulder and base use MG996Rs. Run <code>forge budget</code> to recompute after changing link lengths.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet">
+    <div class="sheet-head">
+      <div class="eyebrow">Software</div>
+      <h2>How the code fits together</h2>
+      <p>The AI never drives a motor. It writes a recipe, the planner proves the recipe safe in this simulation, and only then does the ESP32 move servos. The e-stop and watchdog sit underneath everything.</p>
+    </div>
+    <div class="layers">
+      <div class="layer"><span class="nm">Claude / GPT</span><span class="what">Writes and fixes recipes through MCP tools: describe_cell, check_reach, plan_recipe, save_recipe, run_recipe (asks you first), stop.</span><span class="files">forge/mcp_server.py</span></div>
+      <div class="layer"><span class="nm">Recipe planner</span><span class="what">Turns steps like pick, place, hold, press and inspect into straight-line moves, checks reach and joint limits for every 20 mm waypoint, and rejects plans where more than two arms share the centre zone.</span><span class="files">forge/planner.py<br>recipes/*.yaml</span></div>
+      <div class="layer"><span class="nm">Kinematics</span><span class="what">Inverse kinematics from an (x, y, z) target to five joint angles, then to servo degrees using each arm's calibration trims.</span><span class="files">forge/kinematics.py<br>cell.yaml</span></div>
+      <div class="layer"><span class="nm">Executor + vision</span><span class="what">Plays the timeline over USB serial, waits for the IR sensor, runs camera checks and aborts on a failed inspection.</span><span class="files">forge/executor.py<br>forge/vision.py</span></div>
+      <div class="layer"><span class="nm">ESP32 firmware</span><span class="what">100 Hz servo interpolation on two PCA9685 boards, pump and conveyor, e-stop latch, and a 1.5 s watchdog that freezes the arms if the Pi goes quiet.</span><span class="files">firmware/forge_esp32/</span></div>
+    </div>
+    <div class="fileload">
+      <label for="loadjson">Play your own recipe: run <code>forge export my_recipe.yaml -o my.json</code>, then open the file here:</label>
+      <input type="file" id="loadjson" accept="application/json,.json">
+      <span id="loadmsg"></span>
+    </div>
+  </section>
+</div>
+
+<script id="forge-data" type="application/json">__FORGE_DATA__</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+const DATA = JSON.parse(document.getElementById('forge-data').textContent);
+const ROLE = { arm1: 'Loader', arm2: 'Holder', arm3: 'Tool', arm4: 'Inspect' };
+
+const STAGES = [
+  {
+    id: 'week1', wk: 'Week 1', name: 'One arm on the bench', data: DATA.week1, show: { conveyor: false, camera: false, zone: false, trays: false },
+    html: () => `
+      <div><div class="eyebrow">Week 1 of 4</div><h2>One arm on the bench</h2></div>
+      <p class="goal">Prove that one arm goes exactly where the code says. Everything later depends on this.</p>
+      <div><h4>Build</h4><ul>
+        <li>Print the base turret and three links (55 / 80 / 80 / 45 mm).</li>
+        <li>Servos: 2× MG996R (base, shoulder), 1× MG90S (elbow), 2× SG90 (wrist, gripper).</li>
+        <li>ESP32 + PCA9685 at 0x40, a 6 V 10 A supply for the servos and the e-stop button in series with it.</li>
+      </ul></div>
+      <div><h4>Do</h4><ol>
+        <li>Flash <code>firmware/forge_esp32</code>. Send <code>{"cmd":"move","arm":1,"servo":[90,90,90,90,90],"ms":500}</code> and fit the servo horns at 90°.</li>
+        <li>Run <code>forge budget</code> to check reach and torque for your link lengths.</li>
+        <li>Run the calibration sweep. Where a joint is off, write the error into <code>trims.arm1</code> in <code>cell.yaml</code>.</li>
+        <li>Move the block between the two pads and measure with a ruler.</li>
+      </ol></div>
+      <div><h4>In the simulation</h4><p>Arm 1 rises to its ready pose and sweeps every joint ±20°, then picks the block from pad A, places it on pad B and brings it back.</p></div>
+      <div class="done"><b>Done when</b> the block lands within 2 mm of the pad mark 10 times in a row.</div>
+      <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
+  },
+  {
+    id: 'week2', wk: 'Week 2', name: 'Four arms, one plate', data: DATA.week2, show: { conveyor: false, camera: false, zone: true, trays: false },
+    html: () => `
+      <div><div class="eyebrow">Week 2 of 4</div><h2>Four arms, one plate</h2></div>
+      <p class="goal">Run four arms around one work plate without them ever hitting each other.</p>
+      <div><h4>Build</h4><ul>
+        <li>Three more arms, same parts as week 1.</li>
+        <li>Second PCA9685: bridge the A0 pad so it answers at 0x41 (arm 4 lives there).</li>
+        <li>Base board with the arms on a 100 mm circle and the fixture in the centre.</li>
+      </ul></div>
+      <div><h4>The rule that prevents crashes</h4><p>The centre is a shared zone: a 45 mm cylinder over the fixture that holds at most two arms. Each arm owns its corner. The planner rejects any recipe that breaks this before a servo moves. This is the real message for three arms entering at once:</p></div>
+      <pre class="err">${esc(DATA.conflict_error)}</pre>
+      <div><h4>In the simulation</h4><p>All four arms calibrate together, then pairs visit the centre. Watch the zone chip: it never goes above 2/2.</p></div>
+      <div class="done"><b>Done when</b> this recipe runs 5 times with no contact, and <code>forge plan recipes/week2_zone_conflict.yaml</code> is rejected.</div>
+      <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
+  },
+  {
+    id: 'week3', wk: 'Week 3', name: 'First product', data: DATA.week3, show: { conveyor: true, camera: true, zone: true, trays: true },
+    html: () => `
+      <div><div class="eyebrow">Week 3 of 4</div><h2>First product: LED keychain</h2></div>
+      <p class="goal">A printed housing arrives on the conveyor. The arms fit an LED and a cap, check the result and unload it.</p>
+      <div><h4>Build</h4><ul>
+        <li>Conveyor: N20 motor, belt and two rollers, driven by a DRV8833.</li>
+        <li>IR break-beam at the end of the belt (tells the planner the part has arrived).</li>
+        <li>Overhead USB camera with ArUco markers 0 to 3 on the plate corners.</li>
+        <li>Mini vacuum pump on arm 4, and trays for LEDs and caps.</li>
+      </ul></div>
+      <div><h4>Who does what</h4><ul>
+        <li><b style="color:var(--arm1)">Arm 1 Loader</b> moves the housing and the cap.</li>
+        <li><b style="color:var(--arm2)">Arm 2 Holder</b> clamps the housing while others work.</li>
+        <li><b style="color:var(--arm3)">Arm 3 Tool</b> presses the cap home.</li>
+        <li><b style="color:var(--arm4)">Arm 4 Inspect</b> places the LED by vacuum, checks it and unloads.</li>
+      </ul></div>
+      <div class="done"><b>Done when</b> 10 keychains in a row pass the inspection step.</div>
+      <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
+  },
+  {
+    id: 'week4', wk: 'Week 4', name: 'Claude takes the controls', data: DATA.week3, show: { conveyor: true, camera: true, zone: true, trays: true },
+    html: () => `
+      <div><div class="eyebrow">Week 4 of 4</div><h2>Claude takes the controls</h2></div>
+      <p class="goal">Connect the machine to Claude through MCP. Claude writes the recipe, the planner checks it, you approve, the arms build.</p>
+      <div><h4>Set up</h4><ol>
+        <li>On the Pi: <code>pip install -e "controller[hardware,mcp]"</code></li>
+        <li>Add the server to your Claude config:</li>
+      </ol></div>
+      <pre>${esc(JSON.stringify({ mcpServers: { 'forge-mini': { command: 'python', args: ['-m', 'forge.mcp_server'], env: { FORGE_PORT: '/dev/ttyUSB0' } } } }, null, 2))}</pre>
+      <div><h4>A real session (errors are the planner's actual output)</h4>
+      <div class="chat">
+        <div class="msg user"><span class="who">You</span>Build me an LED keychain and put it in the output tray.</div>
+        <div class="msg tool"><span class="who">Claude → plan_recipe</span><code>ai_first_draft.yaml: … step 12: place {arm: arm3, to: output}</code><span class="res-bad">${esc(DATA.draft_error)}</span></div>
+        <div class="msg"><span class="who">Claude</span>Arm 3 sits in the far corner from the output tray. Arm 4 is next to it, so I'll have arm 4 unload instead.</div>
+        <div class="msg tool"><span class="who">Claude → save_recipe</span><code>led_keychain.yaml</code><span class="res-ok">ok · 12 steps · ${DATA.week3.duration.toFixed(1)} s</span></div>
+        <div class="msg"><span class="who">Claude</span>The plan is clean and takes ${DATA.week3.duration.toFixed(0)} s. Shall I run it?</div>
+        <div class="msg user"><span class="who">You</span>Yes, go.</div>
+        <div class="msg tool"><span class="who">Claude → run_recipe</span><code>name: led_keychain, confirm: true</code><span class="res-ok">running, playing in the viewport</span></div>
+      </div></div>
+      <div class="done"><b>Safety rules:</b> Claude only submits recipes. Every recipe is planned first, nothing runs without confirm, and the hardware e-stop cannot be overridden by software.</div>
+      <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
+  },
+];
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+const rad = d => d * Math.PI / 180;
+const W = (x, y, z) => new THREE.Vector3(x, z, -y);   // cell mm (Z up) -> three.js (Y up)
+
+// ---------- scene ----------
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 4000);
+camera.position.set(250, 300, 360);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.set(0, 25, 0);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 180; controls.maxDistance = 1100;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+sun.position.set(180, 420, 160);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -220, right: 220, top: 220, bottom: -220, near: 50, far: 900 });
+scene.add(sun);
+
+const M = {}; // theme-tracked materials
+function mat(key, opts = {}) { const m = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.05, ...opts }); m.userData.key = key; (M[key] ||= []).push(m); return m; }
+function box(w, h, d, m, x = 0, y = 0, z = 0) { const g = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); g.position.set(x, y, z); g.castShadow = g.receiveShadow = true; return g; }
+function cyl(r, h, m, seg = 24) { const g = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m); g.castShadow = g.receiveShadow = true; return g; }
+
+const BOARD_TOP = -13;
+const world = new THREE.Group(); scene.add(world);
+world.add(box(330, 8, 330, mat('--board'), 0, BOARD_TOP - 4, 0));
+
+// fixture: pocket floor at -6, walls up to 0
+const fixture = new THREE.Group(); world.add(fixture);
+fixture.add(box(46, 7, 46, mat('--plate'), 0, BOARD_TOP + 3.5, 0));
+for (const [x, z, w, d] of [[15, 0, 4, 34], [-15, 0, 4, 34], [0, 15, 26, 4], [0, -15, 26, 4]]) fixture.add(box(w, 6, d, mat('--plate'), x, -3, z));
+
+// calibration pads
+const pads = new THREE.Group(); world.add(pads);
+for (const k of ['cal_a', 'cal_b']) {
+  const [x, y] = DATA.week1.cell.locations[k];
+  const p = box(20, 1, 20, mat('--accent', { roughness: 0.9 }), 0, 0, 0); p.position.copy(W(x, y, BOARD_TOP + 0.5)); pads.add(p);
+}
+
+// trays
+const trays = new THREE.Group(); world.add(trays);
+function tray(loc, top, w) { const [x, y] = DATA.week3.cell.locations[loc]; const h = top - BOARD_TOP; const t = box(w, h, w, mat('--metal'), 0, 0, 0); t.position.copy(W(x, y, BOARD_TOP + h / 2)); trays.add(t); }
+tray('led_tray', -4, 26); tray('cap_tray', 0, 32);
+const out = new THREE.Group(); trays.add(out);
+{ const [x, y] = DATA.week3.cell.locations.output; out.position.copy(W(x, y, 0));
+  out.add(box(42, 1, 42, mat('--metal'), 0, -12.5, 0));
+  for (const [ox, oz, w, d] of [[20, 0, 2, 42], [-20, 0, 2, 42], [0, 20, 42, 2], [0, -20, 42, 2]]) out.add(box(w, 10, d, mat('--metal'), ox, -8, oz)); }
+
+// conveyor
+const conveyor = new THREE.Group(); world.add(conveyor);
+const belt = box(80, 1, 30, mat('--servo', { roughness: 0.95 }), -128, -12.5, 0); conveyor.add(belt);
+for (const x of [-168, -88]) { const r = cyl(5, 34, mat('--metal', { metalness: 0.4 })); r.rotation.x = Math.PI / 2; r.position.set(x, -16, 0); conveyor.add(r); }
+const stripes = [];
+for (let i = 0; i < 8; i++) { const s = box(2, 0.6, 28, mat('--metal'), 0, -11.8, 0); conveyor.add(s); stripes.push(s); }
+const irPosts = [];
+for (const z of [-20, 20]) { const p = box(4, 18, 4, mat('--servo'), -100, -4, z); conveyor.add(p); irPosts.push(p); }
+const beamMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85 });
+const beam = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 36), beamMat); beam.position.set(-100, -2, 0); conveyor.add(beam);
+
+// overhead camera
+const camRig = new THREE.Group(); world.add(camRig);
+camRig.add(box(8, 300, 8, mat('--metal'), 135, 135, -135));
+const boom = box(200, 6, 6, mat('--metal'), 0, 0, 0); boom.position.set(70, 282, -70); boom.rotation.y = Math.PI / 4; camRig.add(boom);
+camRig.add(box(22, 14, 22, mat('--servo'), 0, 272, 0));
+const fov = new THREE.Mesh(new THREE.ConeGeometry(70, 250, 4, 1, true), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.025, side: THREE.DoubleSide, depthWrite: false }));
+fov.position.set(0, 140, 0); fov.rotation.y = Math.PI / 4; camRig.add(fov); fov.material.userData.key = '--accent'; (M['--accent'] ||= []).push(fov.material);
+
+// shared zone
+const zoneMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false });
+const zone = new THREE.Mesh(new THREE.CylinderGeometry(45, 45, 120, 48, 1, true), zoneMat); zone.position.set(0, 47, 0); world.add(zone);
+const zoneRing = new THREE.Mesh(new THREE.RingGeometry(44, 45.5, 64), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.7 }));
+zoneRing.rotation.x = -Math.PI / 2; zoneRing.position.y = BOARD_TOP + 0.6; world.add(zoneRing);
+
+// ---------- arms ----------
+const L = DATA.week3.cell.links;
+const ARMS = {};
+function makeArm(name, spec) {
+  const color = mat('--' + name, { roughness: 0.45 });
+  const dark = mat('--servo', { roughness: 0.5 });
+  const root = new THREE.Group(); root.position.copy(W(spec.base[0], spec.base[1], 0)); root.rotation.y = rad(spec.yaw); world.add(root);
+  const foot = cyl(24, 6, mat('--metal', { metalness: 0.3 })); foot.position.y = BOARD_TOP + 3; root.add(foot);
+  const yawG = new THREE.Group(); yawG.position.y = BOARD_TOP + 6; root.add(yawG);
+  const turret = cyl(17, 16, dark); turret.position.y = 8; yawG.add(turret);
+  const colH = L.h0 - (BOARD_TOP + 6) - 16;
+  yawG.add(box(14, colH, 26, color, 0, 16 + colH / 2, 0));
+  const sh = new THREE.Group(); sh.position.y = L.h0 - (BOARD_TOP + 6); yawG.add(sh);
+  const hub = (r) => { const h = cyl(r, 22, dark); h.rotation.x = Math.PI / 2; return h; };
+  sh.add(hub(9)); sh.add(box(L.L1, 9, 14, color, L.L1 / 2, 0, 0));
+  const el = new THREE.Group(); el.position.x = L.L1; sh.add(el);
+  el.add(hub(7)); el.add(box(L.L2, 7, 11, color, L.L2 / 2, 0, 0));
+  const wr = new THREE.Group(); wr.position.x = L.L2; el.add(wr);
+  wr.add(hub(5.5)); wr.add(box(L.L3 - 14, 10, 12, dark, (L.L3 - 14) / 2, 0, 0));
+  const fingers = [];
+  if (spec.tool === 'gripper') {
+    for (const s of [-1, 1]) { const f = box(14, 6, 2.5, color, L.L3 - 7, 0, s * 6); wr.add(f); fingers.push({ m: f, s }); }
+  } else if (spec.tool === 'vacuum') {
+    const n = cyl(2.5, 14, color, 12); n.rotation.z = Math.PI / 2; n.position.x = L.L3 - 7; wr.add(n);
+    const cup = cyl(5, 3, mat('--accent'), 16); cup.rotation.z = Math.PI / 2; cup.position.x = L.L3 - 1.5; wr.add(cup); fingers.push({ cup });
+    const lens = cyl(3, 4, dark, 12); lens.rotation.z = Math.PI / 2; lens.position.set(L.L3 - 18, 0, 9); wr.add(lens);
+  } else {
+    wr.add(box(14, 5, 5, color, L.L3 - 9, 0, 0)); wr.add(box(3, 16, 16, color, L.L3 - 1.5, 0, 0));
+  }
+  const tip = new THREE.Object3D(); tip.position.x = L.L3; wr.add(tip);
+  const insp = new THREE.Mesh(new THREE.ConeGeometry(26, 50, 20, 1, true), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+  insp.material.userData.key = '--' + name; (M['--' + name] ||= []).push(insp.material);
+  insp.rotation.z = Math.PI / 2; insp.position.x = L.L3 + 25; wr.add(insp);
+  ARMS[name] = { root, yawG, sh, el, wr, tip, fingers, insp, spec };
+}
+for (const [name, spec] of Object.entries(DATA.week3.cell.arms)) makeArm(name, spec);
+
+function pose(arm, j) {
+  arm.yawG.rotation.y = rad(j[0]); arm.sh.rotation.z = rad(j[1]); arm.el.rotation.z = rad(j[2]); arm.wr.rotation.z = rad(j[3]);
+  for (const f of arm.fingers) if (f.m) { const open = THREE.MathUtils.clamp((95 - j[4]) / 75, 0, 1); f.m.position.z = f.s * (3.2 + 6 * open); }
+}
+
+// ---------- items ----------
+const ITEM_SPECS = {
+  block:   { h: 12, make: () => box(14, 12, 14, mat('--accent', { roughness: 0.5 })) },
+  housing: { h: 12, make: () => box(24, 12, 24, mat('--plate', { roughness: 0.4 })) },
+  led:     { h: 8,  make: () => { const g = new THREE.Group(); const b = cyl(3, 6, mat('--surface-led', { emissive: 0xff5a1f, emissiveIntensity: 0.35, color: 0xff7a3d }), 14); b.position.y = -1; g.add(b); const d = new THREE.Mesh(new THREE.SphereGeometry(3, 14, 10), b.material); d.position.y = 2; g.add(d); return g; } },
+  cap:     { h: 4,  make: () => box(26, 4, 26, new THREE.MeshStandardMaterial({ color: 0xbfd7ff, transparent: true, opacity: 0.55, roughness: 0.2 })) },
+};
+let itemMeshes = {};
+function buildItems(data) {
+  for (const m of Object.values(itemMeshes)) world.remove(m);
+  itemMeshes = {};
+  for (const e of data.events) if (e.type === 'spawn' || e.type === 'declare') {
+    const spec = ITEM_SPECS[e.data.kind] || ITEM_SPECS.block;
+    const inner = spec.make(); inner.position.y = -spec.h / 2;
+    inner.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+    const g = new THREE.Group(); g.add(inner); g.visible = false; world.add(g); itemMeshes[e.data.item] = g;
+  }
+}
+
+// ---------- timeline sampling ----------
+let stage = null, data = null, bySeg = {}, steps = [], t = 0, playing = true, speed = 1, hold = 0;
+function index(d) {
+  bySeg = {};
+  for (const s of d.segments) (bySeg[s.arm] ||= []).push(s);
+  for (const a in bySeg) bySeg[a].sort((x, y) => x.t0 - y.t0);
+  steps = d.events.filter(e => e.type === 'step');
+}
+function jointsAt(arm, tt) {
+  const segs = bySeg[arm] || [];
+  let lo = 0, hi = segs.length - 1, k = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (segs[m].t0 <= tt) { k = m; lo = m + 1; } else hi = m - 1; }
+  if (k < 0) return data.initial?.[arm] || (segs[0] ? segs[0].start : [0, 120, -120, -90, 20]);
+  const s = segs[k]; const f = s.dur > 0 ? Math.min(1, (tt - s.t0) / s.dur) : 1;
+  return s.start.map((v, i) => v + (s.end[i] - v) * f);
+}
+const tmpV = new THREE.Vector3();
+function tipWorld(name) { ARMS[name].tip.getWorldPosition(tmpV); return tmpV.clone(); }
+
+function itemStates(tt) {
+  const st = {};
+  for (const e of data.events) {
+    if (e.t > tt) break;
+    const d = e.data;
+    if (e.type === 'spawn') st[d.item] = { mode: 'at', pos: d.pos };
+    else if (e.type === 'declare') st[d.item] = { mode: 'hidden' };
+    else if (e.type === 'conveyor') st[d.item] = { mode: 'conv', frm: d.frm, to: d.to, t0: e.t, dur: d.dur };
+    else if (e.type === 'attach') st[d.item] = { mode: 'held', arm: d.arm };
+    else if (e.type === 'detach') {
+      if (d.into && st[d.into]) { const pp = st[d.into].pos || d.pos; st[d.item] = { mode: 'child', parent: d.into, off: [d.pos[0] - pp[0], d.pos[1] - pp[1], d.pos[2] - pp[2]] }; }
+      else st[d.item] = { mode: 'at', pos: d.pos };
+    }
+  }
+  return st;
+}
+function resolve(st, name, tt, depth = 0) {
+  const s = st[name]; if (!s || s.mode === 'hidden' || depth > 4) return null;
+  if (s.mode === 'at') return W(...s.pos);
+  if (s.mode === 'conv') { const f = Math.min(1, Math.max(0, (tt - s.t0) / s.dur)); return W(...s.frm.map((v, i) => v + (s.to[i] - v) * f)); }
+  if (s.mode === 'held') return ARMS[s.arm] && ARMS[s.arm].root.visible ? tipWorld(s.arm) : null;
+  if (s.mode === 'child') { const p = resolve(st, s.parent, tt, depth + 1); return p ? p.clone().add(new THREE.Vector3(s.off[0], s.off[2], -s.off[1])) : null; }
+  return null;
+}
+
+// ---------- HUD ----------
+const hud = document.getElementById('hud'), stepLabel = document.getElementById('steplabel');
+const scrub = document.getElementById('scrub'), timeEl = document.getElementById('time'), playBtn = document.getElementById('play');
+let lastHud = '';
+function update(tt) {
+  for (const [name, arm] of Object.entries(ARMS)) if (arm.root.visible) pose(arm, jointsAt(name, tt));
+  scene.updateMatrixWorld(true);
+
+  const st = itemStates(tt);
+  for (const [name, mesh] of Object.entries(itemMeshes)) { const p = resolve(st, name, tt); mesh.visible = !!p; if (p) mesh.position.copy(p); }
+
+  const ev = data.events;
+  const convOn = ev.some(e => e.type === 'conveyor' && tt >= e.t && tt <= e.t + e.data.dur);
+  if (stage.show.conveyor) stripes.forEach((s, i) => { s.position.x = -166 + ((i * 10 + (convOn ? tt * 60 : 0)) % 76); });
+  const housing = st.housing, input = DATA.week3.cell.locations.input;
+  const partAtIr = !!(housing && housing.mode === 'conv' && tt >= housing.t0 + housing.dur - 0.25) || !!(housing && housing.mode === 'at' && Math.abs(housing.pos[0] - input[0]) < 3);
+  beamMat.color.set(partAtIr ? css('--ok') : css('--bad'));
+  let pumpOn = false;
+  for (const e of ev) { if (e.t > tt) break; if (e.type === 'pump') pumpOn = e.data.on; }
+  for (const [name, arm] of Object.entries(ARMS)) {
+    const insp = ev.find(e => e.type === 'inspect' && e.data.arm === name && tt >= e.t - 0.8 && tt <= e.t + 0.1);
+    arm.insp.material.opacity = insp ? 0.22 : 0;
+  }
+
+  const zc = data.cell.zone; let inZone = [];
+  for (const [name, arm] of Object.entries(ARMS)) if (arm.root.visible) { const p = tipWorld(name); if (Math.hypot(p.x - zc.center[0], -p.z - zc.center[1]) <= zc.radius) inZone.push(name); }
+  const over = inZone.length > zc.capacity;
+  zoneMat.color.set(over ? css('--bad') : inZone.length ? css('--accent') : css('--muted'));
+  zoneMat.opacity = inZone.length ? 0.16 : 0.07;
+  zoneRing.material.color.copy(zoneMat.color);
+
+  let cur = null; for (const s of steps) { if (s.t <= tt + 1e-6) cur = s; else break; }
+  const chips = [];
+  if (stage.show.zone) chips.push(`<span class="chip ${over ? 'bad' : inZone.length ? 'live' : ''}">Centre zone ${inZone.length}/${zc.capacity}${inZone.length ? ' · ' + inZone.join(', ') : ''}</span>`);
+  if (stage.show.conveyor) chips.push(`<span class="chip ${convOn ? 'live' : ''}">Conveyor ${convOn ? 'running' : 'stopped'}</span>`, `<span class="chip ${partAtIr ? 'ok' : ''}">IR ${partAtIr ? 'part present' : 'clear'}</span>`);
+  if (Object.values(data.cell.arms).some(a => a.tool === 'vacuum') && stage.show.trays) chips.push(`<span class="chip ${pumpOn ? 'live' : ''}">Pump ${pumpOn ? 'on' : 'off'}</span>`);
+  const html = chips.join('') + '|' + (cur ? cur.data.index : '');
+  if (html !== lastHud) {
+    lastHud = html; hud.innerHTML = chips.join('');
+    stepLabel.textContent = cur ? `${cur.data.index}. ${cur.data.label}` : '';
+    document.querySelectorAll('#steps button').forEach(b => b.toggleAttribute('aria-current', false));
+    if (cur) { const b = document.querySelector(`#steps button[data-i="${cur.data.index}"]`); if (b) b.setAttribute('aria-current', 'step'); }
+  }
+  scrub.value = tt; timeEl.textContent = `${tt.toFixed(1)} / ${data.duration.toFixed(1)} s`;
+}
+
+// ---------- stage switching ----------
+const tabs = document.getElementById('tabs'), guide = document.getElementById('guide'), legend = document.getElementById('legend');
+function renderTabs() {
+  tabs.innerHTML = STAGES.map(s => `<button class="tab" role="tab" type="button" id="tab-${s.id}" aria-selected="${s === stage}"><span class="wk">${s.wk}</span><span class="nm">${s.name}</span></button>`).join('');
+  STAGES.forEach(s => document.getElementById('tab-' + s.id).onclick = () => setStage(s));
+}
+function setStage(s, keepHash) {
+  stage = s; data = s.data; index(data); buildItems(data);
+  const armsOn = Object.keys(data.cell.arms);
+  for (const [name, arm] of Object.entries(ARMS)) arm.root.visible = armsOn.includes(name);
+  conveyor.visible = s.show.conveyor; camRig.visible = s.show.camera; zone.visible = zoneRing.visible = s.show.zone; trays.visible = s.show.trays;
+  pads.visible = !s.show.trays;
+  scrub.max = data.duration; t = 0; hold = 0; lastHud = '';
+  guide.innerHTML = s.html();
+  document.getElementById('steps').innerHTML = steps.map(e => `<li><button type="button" data-i="${e.data.index}" data-t="${e.t}"><span class="t">${e.t.toFixed(1)}s</span><span>${esc(e.data.label)}</span></button></li>`).join('');
+  document.querySelectorAll('#steps button').forEach(b => b.onclick = () => { t = +b.dataset.t + 0.01; update(t); });
+  legend.innerHTML = armsOn.map(n => `<span><i style="background:var(--${n})"></i>${n} · ${ROLE[n] || data.cell.arms[n].role} (${data.cell.arms[n].tool})</span>`).join('') + (s.show.zone ? `<span><i style="background:var(--accent);opacity:.5"></i>shared centre zone</span>` : '');
+  renderTabs();
+  if (!keepHash) try { history.replaceState(null, '', '#' + s.id); } catch (e) {}
+  update(0);
+}
+
+// ---------- theme ----------
+function applyTheme() {
+  scene.background = new THREE.Color(css('--scene'));
+  for (const [key, list] of Object.entries(M)) { const c = css(key); if (!c) continue; for (const m of list) m.color.set(c); }
+  lastHud = '';
+  if (data) update(t);
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------- loop ----------
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    if (w < 560) camera.position.set(400, 460, 580);
+  }
+}
+let last = performance.now();
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  resize();
+  if (playing) {
+    if (t >= data.duration) { hold += dt; if (hold > 1.5) { t = 0; hold = 0; } }
+    else t = Math.min(data.duration, t + dt * speed);
+    update(t);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? 'Pause' : 'Play'; };
+document.getElementById('restart').onclick = () => { t = 0; hold = 0; update(0); };
+scrub.oninput = () => { t = +scrub.value; update(t); };
+document.getElementById('speed').onchange = e => { speed = +e.target.value; };
+document.getElementById('loadjson').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const msg = document.getElementById('loadmsg');
+  try {
+    const d = JSON.parse(await f.text());
+    if (!d.segments || !d.cell) throw new Error('not a forge export');
+    if (!d.cell.arms) throw new Error('missing arms');
+    const custom = { id: 'custom', wk: 'Yours', name: d.product || f.name, data: d, show: { conveyor: d.events.some(x => x.type === 'conveyor'), camera: true, zone: true, trays: true },
+      html: () => `<div><div class="eyebrow">Your recipe</div><h2>${esc(d.product || f.name)}</h2></div><p class="goal">Planned by your copy of the controller: ${d.segments.length} moves, ${d.duration.toFixed(1)} s.</p><div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>` };
+    const i = STAGES.findIndex(s => s.id === 'custom'); if (i >= 0) STAGES.splice(i, 1);
+    setStage(custom, true);
+    msg.textContent = 'Loaded. Playing above.';
+  } catch (err) { msg.textContent = 'Could not read that file: ' + err.message; }
+};
+
+const initial = STAGES.find(s => '#' + s.id === location.hash) || STAGES[0];
+applyTheme();
+setStage(initial, true);
+if (reduced) { playing = false; playBtn.textContent = 'Play'; }
+requestAnimationFrame(frame);
+})();
+</script>

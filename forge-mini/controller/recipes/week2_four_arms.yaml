@@ -1,0 +1,26 @@
+# Week 2: four arms share one plate. Each arm visits the centre while the
+# zone manager limits how many can be inside at once.
+product: week2_four_arms
+items:
+  block: {at: fixture, kind: block}
+steps:
+  - parallel:
+      - calibrate: {arm: arm1}
+      - calibrate: {arm: arm2}
+      - calibrate: {arm: arm3}
+      - calibrate: {arm: arm4}
+    note: All four arms calibrate at the same time (each in its own corner)
+  - parallel:
+      - inspect: {arm: arm1, at: fixture}
+      - inspect: {arm: arm2, at: fixture}
+    note: Two arms in the centre zone together (capacity 2, allowed)
+  - parallel:
+      - inspect: {arm: arm3, at: fixture}
+      - inspect: {arm: arm4, at: fixture}
+  - pick:  {arm: arm1, item: block, from: fixture}
+    note: Hand-off - arm1 takes the block out...
+  - place: {arm: arm1, to: cal_b}
+  - pick:  {arm: arm1, item: block, from: cal_b}
+    note: ...and puts it back for the next arm
+  - place: {arm: arm1, to: fixture}
+  - press: {arm: arm3, at: fixture.top, depth: 2}

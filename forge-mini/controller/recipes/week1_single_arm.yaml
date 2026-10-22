@@ -1,0 +1,13 @@
+# Week 1: one arm on the bench. Calibrate every joint, then move a block
+# between two marked spots and back.
+product: week1_single_arm
+arms: [arm1]
+items:
+  block: {at: cal_a, kind: block}
+steps:
+  - calibrate: {arm: arm1, sweep: 20}
+    note: Calibration sweep, each joint +/-20 deg
+  - pick:  {arm: arm1, item: block, from: cal_a}
+  - place: {arm: arm1, to: cal_b}
+  - pick:  {arm: arm1, item: block, from: cal_b}
+  - place: {arm: arm1, to: cal_a}

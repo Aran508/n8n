@@ -1,0 +1,76 @@
+# Forge Mini cell definition.
+# World frame: origin = centre of the work plate top surface, X right, Y away
+# from the operator, Z up. All lengths in millimetres, angles in degrees.
+
+links:            # identical geometry for all four arms (see docs/ARM_DESIGN.md)
+  h0: 55          # work-plate top -> shoulder axis
+  L1: 80          # shoulder -> elbow (upper arm)
+  L2: 80          # elbow -> wrist (forearm)
+  L3: 45          # wrist -> tool tip
+
+# Arms sit on a 100 mm circle around the plate centre, one per corner.
+# `yaw` is the direction the arm faces when its base servo is at 90 deg
+# (pointing at the plate centre).
+arms:
+  arm1: {role: loader,  base: [-70.7,  70.7], yaw: -45,  tool: gripper, board: 0x40, first_channel: 0}
+  arm2: {role: holder,  base: [ 70.7,  70.7], yaw: -135, tool: gripper, board: 0x40, first_channel: 5}
+  arm3: {role: tool,    base: [-70.7, -70.7], yaw: 45,   tool: press,   board: 0x40, first_channel: 10}
+  arm4: {role: inspect, base: [ 70.7, -70.7], yaw: 135,  tool: vacuum,  board: 0x41, first_channel: 0}
+
+# Joint -> servo mapping. servo_deg = offset + sign * joint_deg + trim
+# Trims are per arm and come from the calibration step (week 1).
+servo_map:
+  base:     {offset: 90, sign: 1,  min: -90,  max: 90}
+  shoulder: {offset: 0,  sign: 1,  min: 0,    max: 180}
+  elbow:    {offset: 0,  sign: -1, min: -180, max: 0}
+  wrist:    {offset: 90, sign: 1,  min: -90,  max: 90}
+  tool:     {offset: 0,  sign: 1,  min: 0,    max: 180}
+
+trims:
+  arm1: [0, 0, 0, 0, 0]
+  arm2: [0, 0, 0, 0, 0]
+  arm3: [0, 0, 0, 0, 0]
+  arm4: [0, 0, 0, 0, 0]
+
+tools:
+  gripper: {open: 20, closed: 95}
+  vacuum:  {open: 90, closed: 90, pump_channel: pump}
+  press:   {open: 90, closed: 90}
+
+motion:
+  speed_mm_s: 80        # cartesian speed used to size move durations
+  min_move_ms: 250
+  approach_height: 35   # mm above a location before descending
+  tool_pitch: -90       # tool points straight down
+
+# Shared centre zone: a vertical cylinder over the fixture. At most
+# `capacity` arms may be inside it at the same time.
+zone:
+  center: [0, 0]
+  radius: 45
+  capacity: 2
+
+# Named places (x, y, z of the surface the tool touches).
+locations:
+  conveyor_start: [-150, 0, 0]
+  input:          [-105, 0, 0]
+  fixture:        [0, 0, 6]
+  fixture.slot:   [0, 0, 10]
+  fixture.top:    [0, 0, 14]
+  fixture.edge:   [14, 14, 12]
+  led_tray:       [0, -105, 4]
+  cap_tray:       [0, 105, 4]
+  output:         [105, 0, 0]
+  cal_a:          [-45, 30, 0]
+  cal_b:          [-20, 75, 0]
+
+# Where each arm parks when it is not working (inside its own corner).
+park:
+  arm1: [-40, 40, 60]
+  arm2: [40, 40, 60]
+  arm3: [-40, -40, 60]
+  arm4: [40, -40, 60]
+
+conveyor:
+  speed_mm_s: 60
+  channel: conveyor

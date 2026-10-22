@@ -1,0 +1,8 @@
+# Deliberately wrong: three arms rush into the centre at once. The zone
+# manager (capacity 2) rejects this plan, which is exactly what we want.
+product: week2_zone_conflict
+steps:
+  - parallel:
+      - inspect: {arm: arm1, at: fixture}
+      - inspect: {arm: arm2, at: fixture}
+      - inspect: {arm: arm3, at: fixture}
