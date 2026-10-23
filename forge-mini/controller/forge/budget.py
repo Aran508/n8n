@@ -134,3 +134,69 @@ def report(cell: Cell) -> str:
               "  enough for reaming printed pilot holes and light drilling in plastic or wood;",
               "  not for metal: hobby servos flex, so keep cuts light and let the reamer follow the pilot hole"]
     return "\n".join(lines)
+
+
+# Angle uncertainty per joint (degrees). Hobby servos: ~5 us deadband
+# (0.45 deg) plus metal-gear backlash, ~0.8 deg open loop. With camera
+# look-then-correct the backlash is measured away, but a hobby servo still
+# moves in deadband-sized steps, so it lands within about half a step.
+# Smart serial servos (e.g. Feetech STS3215) have a 4096-count encoder.
+LEVELS = [
+    ("hobby servos, open loop (this prototype)", 0.8, 0.0),
+    ("hobby servos + camera correction", 0.25, 0.15),
+    ("smart servos (STS3215), open loop", 0.2, 0.0),
+    ("smart servos + camera correction", 0.04, 0.15),
+]
+
+# Placement tolerance each kind of job needs (mm)
+JOBS = [
+    ("modules, motors, M2 screws (with lead-in chamfers)", 1.5),
+    ("through-hole LEDs / headers into chamfered holes", 0.5),
+    ("iron on a 1.5 mm solder pad", 0.5),
+    ("SMD 0805 / 0603 into solder paste, then hot-plate reflow", 0.2),
+    ("fine-pitch IC (0.5 mm pitch)", 0.05),
+]
+
+
+def tip_error(cell, arm_name: str = "arm1", at: str = "fixture", tool_len: float = 38.0, err_deg: float = 0.8,
+              mode: str = "sum") -> float:
+    """Tool-tip error (mm) at a location from err_deg on each of the 4 joints.
+
+    mode "sum" is the worst case (all errors line up), "rss" a typical case.
+    """
+    from .kinematics import forward
+
+    arm = cell.arms[arm_name]
+    l3 = cell.links.coupler + tool_len
+    j = inverse(cell, arm, cell.location(at), cell.motion["tool_pitch"], 0, l3)
+    p0 = forward(cell, arm, j, l3)
+    parts = []
+    for i in range(4):
+        jj = list(j)
+        jj[i] += err_deg
+        parts.append(math.dist(forward(cell, arm, jj, l3), p0))
+    return sum(parts) if mode == "sum" else math.sqrt(sum(d * d for d in parts))
+
+
+def precision_levels(cell) -> list[dict]:
+    out = []
+    for name, err, camera in LEVELS:
+        worst = max(max(tip_error(cell, a, err_deg=err) for a in cell.arms), camera)
+        typical = max(max(tip_error(cell, a, err_deg=err, mode="rss") for a in cell.arms), camera)
+        out.append({"level": name, "worst_mm": round(worst, 2), "typical_mm": round(typical, 2)})
+    return out
+
+
+def precision_report(cell) -> str:
+    levels = precision_levels(cell)
+    lines = ["Tool-tip accuracy at the fixture (worst of the 4 arms)", "-" * 54,
+             f"  {'':<44}{'typical':>9}{'worst':>9}"]
+    for lv in levels:
+        lines.append(f"  {lv['level']:<44}{lv['typical_mm']:>7.2f}mm{lv['worst_mm']:>7.2f}mm")
+    lines += ["", "Cheapest level that can do each job (judged on the typical error)", "-" * 64]
+    for job, tol in JOBS:
+        ok = [lv["level"] for lv in levels if lv["typical_mm"] <= tol]
+        lines.append(f"  {job:<52} +/-{tol:<5.2f} {ok[0] if ok else 'not with arms like these: order the board assembled'}")
+    lines += ["", "  Lead-in chamfers, funnels and spring-loaded (compliant) tools let a part find its",
+              "  hole even when the arm is off by about the chamfer size."]
+    return "\n".join(lines)

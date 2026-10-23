@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from .budget import report
+from .budget import precision_report, report
 from .config import load_cell
 from .kinematics import Unreachable, inverse
 from .planner import PlanError, Planner
@@ -39,6 +39,7 @@ def export_payload(cell, recipe: dict, timeline) -> dict:
             "zones": cell.zones,
             "locations": cell.raw["locations"],
             "lock": cell.lock,
+            "flipper": cell.raw.get("flipper"),
         },
         **timeline.to_dict(),
     }
@@ -50,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("budget", help="reach, servo torque per tool, and reaming feed force")
     sub.add_parser("tools", help="list the tool racks and the bit block")
+    sub.add_parser("precision", help="tool-tip accuracy and which assembly jobs it allows")
     ik = sub.add_parser("ik", help="joint + servo angles for one target")
     ik.add_argument("arm")
     ik.add_argument("x", type=float)
@@ -71,6 +73,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "budget":
         print(report(cell))
+        return 0
+
+    if args.cmd == "precision":
+        print(precision_report(cell))
         return 0
 
     if args.cmd == "tools":

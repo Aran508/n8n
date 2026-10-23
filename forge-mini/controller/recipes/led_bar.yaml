@@ -1,8 +1,9 @@
-# Project: LED bar, soldered the way you would on a helping-hands station.
-# One arm clamps the PCB, two arms place LEDs from both sides at once, and the
-# soldering arm follows behind them. Arm 1 places with tweezers, arm 3 with
-# the vacuum cup (there is only one pair of tweezers). You load: the PCB in the kit tray, two
-# LEDs in cup A (back) and two in the side pocket (front).
+# Project: LED bar, through-hole, soldered the way you would on a
+# helping-hands station. One arm clamps the PCB while two arms push LEDs
+# through their holes from both sides. Then the flip fixture turns the board
+# over and the iron solders all 8 legs on the underside, where through-hole
+# joints belong. You load: the PCB in the kit tray, two LEDs in cup A (back)
+# and two in the side pocket (front).
 product: led_bar
 items:
   pcb: {at: kit.part, kind: pcb}
@@ -16,26 +17,29 @@ steps:
   - tool_change: {arm: arm2, tool: clamp}
   - tool_change: {arm: arm4, tool: iron}
   - pick:  {arm: arm3, item: pcb, from: kit.part}
-    note: Loader brings the PCB
+    note: Loader brings the PCB to the flip fixture
   - place: {arm: arm3, to: led.pcb}
   - hold:  {arm: arm2, at: led.hold}
     note: Clamp holds the left end of the board - the helping hand
   - pick:  {arm: arm1, item: l1, from: cup_a}
-    note: LEDs go in from both sides
+    note: LEDs go in from both sides at once
   - place: {arm: arm1, to: led.l1, into: pcb, press: 1}
-  - solder: {arm: arm4, at: [led.j1a, led.j1b]}
-    note: Iron follows right behind
-  - pick:  {arm: arm1, item: l2, from: cup_a}
-  - place: {arm: arm1, to: led.l2, into: pcb, press: 1}
-  - solder: {arm: arm4, at: [led.j2a, led.j2b]}
   - pick:  {arm: arm3, item: l3, from: side.part}
   - place: {arm: arm3, to: led.l3, into: pcb, press: 1}
-  - solder: {arm: arm4, at: [led.j3a, led.j3b]}
+  - pick:  {arm: arm1, item: l2, from: cup_a}
+  - place: {arm: arm1, to: led.l2, into: pcb, press: 1}
   - pick:  {arm: arm3, item: l4, from: side.part}
   - place: {arm: arm3, to: led.l4, into: pcb, press: 1}
-  - solder: {arm: arm4, at: [led.j4a, led.j4b]}
   - release: {arm: arm2}
-  - inspect: {at: led.pcb, check: eight_joints}
+    note: Clamp lets go; the fixture jaws hold the board for the flip
+  - flip: {at: led}
+    note: Flip fixture turns the board over - legs now point up
+  - solder: {arm: arm4, at: [led.bot.j1a, led.bot.j1b, led.bot.j2a, led.bot.j2b]}
+    note: Iron solders the legs on the underside
+  - solder: {arm: arm4, at: [led.bot.j3a, led.bot.j3b, led.bot.j4a, led.bot.j4b]}
+  - flip: {at: led}
+    note: Turn it back, LEDs up
+  - inspect: {at: led.pcb, check: eight_joints_and_leds}
   - tool_change: {arm: arm1, tool: gripper_A}
   - pick:  {arm: arm1, item: pcb, from: led.pcb}
     note: Finished LED bar to the tray

@@ -7,10 +7,23 @@
 //   {"cmd":"move","arm":1,"servo":[90,120,80,60,105],"ms":400}
 //        servo = base, shoulder, elbow, wrist, coupler latch
 //   {"cmd":"tool","arm":4,"value":90}      tool-signal channel (servo-style PWM)
+//   {"cmd":"tower","state":"run"}          run | wait | idle | fault (tower light)
+//   {"cmd":"fan","on":true}  {"cmd":"light","on":true}
 //   {"cmd":"status"}  {"cmd":"ping"}  {"cmd":"reset"}  {"cmd":"relax"}
 //
 // Replies:  {"ok":true}  /  {"ok":false,"err":"..."}
 // Events:   {"event":"probe","arm":3}  {"event":"estop"}  {"event":"watchdog"}
+//           {"event":"interlock","source":"door"|"curtain"}  {"event":"start"}  {"event":"stop"}
+//
+// Enclosure (the mini version of an industrial robot cell):
+//   door      reed switch on the front acrylic door; opening it while anything
+//             moves or spins latches an interlock stop
+//   curtain   IR break-beam pairs across the loading window; a hand in the
+//             window while running latches the same stop
+//   tower     red / yellow / green LED stack: red = e-stop or interlock,
+//             yellow = waiting for the operator, green = running (blinks idle)
+//   buttons   START and STOP on the control panel (E-STOP is separate, wired
+//             in series with the servo supply)
 //
 // Tool coupler (per arm): 4 pogo pins = 6 V, GND, SIG, ID.
 //   SIG: servo PWM from the PCA9685. A gripper uses it directly; the spindle,
@@ -27,6 +40,13 @@
 #include <ArduinoJson.h>
 
 const int PIN_ESTOP = 27;  // normally-closed button to GND (also cuts servo power in hardware)
+const int PIN_DOOR = 13;   // reed switch to GND: LOW = door closed (unplugged reads open = safe)
+const int PIN_CURTAIN = 14;  // IR receivers in series to GND: LOW = all beams clear
+const int PIN_START = 16;  // panel buttons to GND
+const int PIN_STOP = 17;
+const int PIN_RED = 18, PIN_YELLOW = 19, PIN_GREEN = 23;  // tower light via MOSFETs
+const int PIN_FAN = 4;     // fume extractor fan (carbon filter) via MOSFET
+const int PIN_LIGHT = 15;  // overhead LED bar via MOSFET
 const int ID_PINS[4] = {32, 33, 34, 35};  // ADC1 pins, one per arm coupler
 const float ID_PULLUP_OHMS = 10000.0f;
 const float PROBE_OHMS = 4700.0f;
@@ -57,6 +77,8 @@ Motion arms[NUM_ARMS];
 float toolSignal[NUM_ARMS] = {0, 0, 0, 0};
 
 bool estopLatched = false;
+bool interlockLatched = false;
+const char *towerState = "idle";
 bool relaxed = true;  // PWM off until the first move (no power-on jump)
 uint32_t lastHostMsg = 0;
 
@@ -125,8 +147,20 @@ void emit(const char *name, int arm = 0) {
   Serial.println();
 }
 
+bool doorOpen() { return digitalRead(PIN_DOOR) == HIGH; }
+bool curtainBroken() { return digitalRead(PIN_CURTAIN) == HIGH; }
+
+void setTower() {
+  bool blink = (millis() / 500) % 2;
+  bool fault = estopLatched || interlockLatched || strcmp(towerState, "fault") == 0;
+  digitalWrite(PIN_RED, fault);
+  digitalWrite(PIN_YELLOW, !fault && strcmp(towerState, "wait") == 0);
+  digitalWrite(PIN_GREEN, !fault && (strcmp(towerState, "run") == 0 || (strcmp(towerState, "idle") == 0 && blink)));
+}
+
 void handleMove(JsonDocument &doc) {
   if (estopLatched) return reply(false, "estop");
+  if (interlockLatched) return reply(false, "interlock");
   int arm = doc["arm"] | 0;
   JsonArray servo = doc["servo"];
   if (arm < 1 || arm > NUM_ARMS || servo.size() != JOINTS) return reply(false, "bad move");
@@ -144,6 +178,7 @@ void handleMove(JsonDocument &doc) {
 
 void handleTool(JsonDocument &doc) {
   if (estopLatched) return reply(false, "estop");
+  if (interlockLatched) return reply(false, "interlock");
   int arm = doc["arm"] | 0;
   if (arm < 1 || arm > NUM_ARMS) return reply(false, "bad arm");
   float value = doc["value"] | 0.0f;
@@ -157,6 +192,10 @@ void handleStatus() {
   JsonDocument doc;
   doc["ok"] = true;
   doc["estop"] = estopLatched;
+  doc["interlock"] = interlockLatched;
+  doc["door_open"] = doorOpen();
+  doc["curtain_broken"] = curtainBroken();
+  doc["tower"] = towerState;
   doc["relaxed"] = relaxed;
   JsonArray list = doc["arms"].to<JsonArray>();
   JsonArray ids = doc["tool_ohms"].to<JsonArray>();
@@ -184,9 +223,21 @@ void handleLine(const String &line) {
   else if (strcmp(cmd, "status") == 0) handleStatus();
   else if (strcmp(cmd, "ping") == 0) reply(true);
   else if (strcmp(cmd, "relax") == 0) { relaxAll(); reply(true); }
+  else if (strcmp(cmd, "tower") == 0) {
+    const char *st = doc["state"] | "idle";
+    static const char *STATES[] = {"run", "wait", "idle", "fault"};
+    towerState = "idle";
+    for (const char *k : STATES) if (strcmp(st, k) == 0) towerState = k;
+    reply(true);
+  }
+  else if (strcmp(cmd, "fan") == 0) { digitalWrite(PIN_FAN, (doc["on"] | false) ? HIGH : LOW); reply(true); }
+  else if (strcmp(cmd, "light") == 0) { digitalWrite(PIN_LIGHT, (doc["on"] | false) ? HIGH : LOW); reply(true); }
   else if (strcmp(cmd, "reset") == 0) {
     if (digitalRead(PIN_ESTOP) == HIGH) return reply(false, "estop still pressed");
+    if (doorOpen()) return reply(false, "close the door first");
+    if (curtainBroken()) return reply(false, "light curtain still blocked");
     estopLatched = false;
+    interlockLatched = false;
     reply(true);
   } else reply(false, "unknown cmd");
 }
@@ -207,6 +258,11 @@ void watchProbes() {
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_ESTOP, INPUT_PULLUP);
+  pinMode(PIN_DOOR, INPUT_PULLUP);
+  pinMode(PIN_CURTAIN, INPUT_PULLUP);
+  pinMode(PIN_START, INPUT_PULLUP);
+  pinMode(PIN_STOP, INPUT_PULLUP);
+  for (int pin : {PIN_RED, PIN_YELLOW, PIN_GREEN, PIN_FAN, PIN_LIGHT}) { pinMode(pin, OUTPUT); digitalWrite(pin, LOW); }
   analogReadResolution(12);
   for (int a = 0; a < NUM_ARMS; a++) pinMode(ID_PINS[a], INPUT);  // external 10k pull-ups to 3.3 V
 
@@ -238,9 +294,35 @@ void loop() {
     emit("estop");
   }
 
-  // Watchdog: anything moving or spinning with a silent host gets stopped
   bool busy = false;
   for (int a = 0; a < NUM_ARMS; a++) busy |= arms[a].active || toolSignal[a] > 0;
+
+  // Interlocks: door or light curtain while anything moves or spins
+  if (!interlockLatched && busy && (doorOpen() || curtainBroken())) {
+    interlockLatched = true;
+    freezeAll();
+    toolsOff();
+    JsonDocument ev;
+    ev["event"] = "interlock";
+    ev["source"] = doorOpen() ? "door" : "curtain";
+    serializeJson(ev, Serial);
+    Serial.println();
+  }
+
+  // Panel buttons (simple 50 ms debounce)
+  static uint32_t lastBtn = 0;
+  static bool startWas = false, stopWas = false;
+  if (millis() - lastBtn > 50) {
+    lastBtn = millis();
+    bool startNow = digitalRead(PIN_START) == LOW, stopNow = digitalRead(PIN_STOP) == LOW;
+    if (startNow && !startWas) emit("start");
+    if (stopNow && !stopWas) { freezeAll(); toolsOff(); towerState = "wait"; emit("stop"); }
+    startWas = startNow;
+    stopWas = stopNow;
+  }
+  setTower();
+
+  // Watchdog: anything moving or spinning with a silent host gets stopped
   if (busy && millis() - lastHostMsg > WATCHDOG_MS) {
     freezeAll();
     toolsOff();

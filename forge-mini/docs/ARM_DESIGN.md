@@ -100,6 +100,9 @@ No joint goes above 20% with any of the ten tools. The tool changer adds weight 
 | Probe microswitch, fine-liner pen, 3 ml syringe, precision tweezers | – | $7 | ₹550 |
 | USB-C mini soldering iron + N20 solder feeder + 0.5 mm solder | 1 | $30 | ₹2,500 |
 | Filament, M3 screws, bearings, base board | – | $30 | ₹2,400 |
-| **Total** | | **~$327** | **~₹25,600** |
+| **Total (arms and tools)** | | **~$327** | **~₹25,600** |
+| Miniature robot cell (enclosure, interlocks, tower, HMI; see `ENCLOSURE.md`) | – | ~$128 | ~₹10,650 |
+| Flip fixture: printed cradle, 2 × 608 bearings, 1 × MG996R | – | ~$8 | ~₹650 |
+| **Total with cell** | | **~$463** | **~₹36,900** |
 
 **Power:** 12 MG996Rs draw about 1 A each while moving, so use a 6 V supply rated for at least 15 A. Keep it separate from the ESP32 and Pi, joined only at ground. Put the e-stop in series with the servo supply so that pressing it cuts power in hardware.

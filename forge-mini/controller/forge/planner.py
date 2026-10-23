@@ -109,6 +109,7 @@ class Planner:
         # per arm: (t0, t1, tip_start, tip_end, tool_len) for collision checks
         self.track: dict[str, list[tuple]] = {name: [] for name in self.state}
         self.holds: dict[str, list[list[float]]] = {name: [] for name in self.state}
+        self.blocked: list[tuple[float, float, str]] = []  # (t0, t1, zone) no arm may enter, e.g. while flipping
 
     @property
     def pitch(self) -> float:
@@ -350,6 +351,8 @@ class Planner:
         loc = self.cell.location(frm) if frm is not None else tuple(self.items[item]["at"])
         if math.dist(loc[:2], self.items[item]["at"][:2]) > 3:
             raise PlanError(f"{item} is not at {frm}")
+        if self.items[item].get("flipped"):
+            raise PlanError(f"{item} is upside down in the flip fixture; add flip: {{at: {self.items[item]['site']}}} first")
         gripper = self.cell.tools[st.tool].type in ("gripper", "tweezers")
         self.move(arm, self.travel(loc))
         if gripper:
@@ -375,6 +378,7 @@ class Planner:
         self.signal(arm, "open" if gripper else "off")
         self._event(st.t, "detach", arm=arm.name, item=st.holding, pos=list(loc), into=into)
         self.items[st.holding]["at"] = list(loc)
+        self.items[st.holding]["site"] = _site(to)
         st.holding = None
         self.move(arm, self.travel(loc))
         if not stay:
@@ -520,23 +524,61 @@ class Planner:
         self._event(st.t, "calibrated", arm=arm.name)
 
     # ---------- cell-level actions (no arm) ----------
-    def c_inspect(self, at, check="present", **_):
+    def c_inspect(self, at, check="present", start=0.0, **_):
         """Overhead camera check."""
-        self._event(self.clock, "inspect", at=list(self.cell.location(at)), check=check, result="pass")
+        self._event(start, "inspect", at=list(self.cell.location(at)), check=check, result="pass")
         return 0.8
 
-    def c_wait(self, ms, **_):
+    def c_wait(self, ms, start=0.0, **_):
         return float(ms) / 1000
+
+    def c_flip(self, at, start=0.0, **_):
+        """Turn the flip fixture 180 degrees so the underside of the part faces up.
+
+        Arms work from above only; flipping is how the cell solders leads,
+        drives screws or marks on the bottom of a part. No arm may hold the
+        part or be inside the fixture zone while it turns.
+        """
+        spec = self.cell.raw["flipper"]
+        site = _site(at)
+        if site not in spec["sites"]:
+            raise PlanError(f"the flip fixture only takes parts on {', '.join(spec['sites'])}, not {site}")
+        for a, holds in self.holds.items():
+            if any(h0 <= start < h1 for h0, h1 in holds):
+                raise PlanError(f"{a} is still holding the part; add release: {{arm: {a}}} before flipping")
+        zone = self.cell.zones[spec["zone"]]
+        dur = float(spec["seconds"])
+        busy = self._zone_busy(zone, start, start + dur)
+        if busy:
+            raise PlanError(f"{', '.join(busy[1])} would be inside the flip fixture zone at t={busy[0]:.2f}s while it turns")
+        flipped = []
+        for name, item in self.items.items():
+            if item.get("site") == site:
+                item["flipped"] = not item.get("flipped", False)
+                flipped.append(name)
+        self._event(start, "flip", site=site, center=zone["center"], axis_z=spec["axis_z"], dur=dur, items=flipped)
+        self.blocked.append((start, start + dur, spec["zone"]))
+        return dur
+
+    def _zone_busy(self, zone: dict, t_a: float, t_b: float):
+        """First (time, arms) in [t_a, t_b] with any arm's tool tip inside `zone`."""
+        n = int(max(0.0, t_b - t_a) / SAMPLE_S) + 1
+        for k in range(n + 1):
+            t = min(t_a + k * SAMPLE_S, t_b)
+            inside = [a for a in self.state if in_zone(zone, self._pose_at(a, t)[0])]
+            if inside:
+                return t, inside
+        return None
 
     # ---------- driver ----------
     ARM_ACTIONS = {"pick", "place", "hold", "release", "machine", "drive", "solder", "draw", "probe", "move",
                    "park", "calibrate", "tool_change", "bit_change"}
-    CELL_ACTIONS = {"inspect", "wait"}
+    CELL_ACTIONS = {"inspect", "wait", "flip"}
 
     def _run_one(self, action: str, params: dict, start: float) -> float:
         params = {("frm" if k == "from" else k): v for k, v in (params or {}).items()}
         if action in self.CELL_ACTIONS:
-            return start + getattr(self, f"c_{action}")(**params)
+            return start + getattr(self, f"c_{action}")(start=start, **params)
         if action not in self.ARM_ACTIONS:
             raise PlanError(f"unknown action '{action}'")
         arm = self._arm(params.pop("arm", None) or "")
@@ -663,7 +705,7 @@ class Planner:
             barrier.add(self.items[item]["site"])  # lifting a part out: everything on it must be finished
         if action == "place" and not params.get("into"):
             barrier |= {_site(r) for r in refs}     # a new base part lands: earlier work there must be gone
-        if action in ("hold", "inspect"):
+        if action in ("hold", "inspect", "flip"):
             barrier |= sites
         if action == "release" and arm in self._hold_site:
             barrier.add(self._hold_site[arm])
@@ -717,6 +759,13 @@ class Planner:
                 earliest = max(earliest, self.state[arm].t)
             start, tries, last = earliest, 0, None
             horizon = max([earliest] + [d[4] for d in done]) + 120
+            if action == "flip":  # wait until every arm is out of the fixture zone for the whole turn
+                zone = self.cell.zones[self.cell.raw["flipper"]["zone"]]
+                dur = float(self.cell.raw["flipper"]["seconds"])
+                while self._zone_busy(zone, start, start + dur):
+                    start += 0.25
+                    if start > horizon:
+                        raise PlanError(f"step {idx} ({label}): an arm never leaves the fixture zone")
             while True:
                 snap = self._snapshot(arm)
                 try:
@@ -778,6 +827,11 @@ class Planner:
                 d = _tool_gap(poses[a], poses[b])
                 if d < clear:
                     return t, f"{a} and {b} come within {d:.0f} mm at t={t:.2f}s (clearance {clear:.0f} mm)"
+            for b0, b1, zn in self.blocked:
+                if b0 <= t <= b1:
+                    inside = [a for a in names if in_zone(self.cell.zones[zn], poses[a][0]) and (arm is None or a == arm)]
+                    if inside:
+                        return t, f"{', '.join(inside)} would be in the {zn} zone at t={t:.2f}s while the fixture flips"
             for zn, zone in self.cell.zones.items():
                 inside = [a for a in names if in_zone(zone, poses[a][0])]
                 if len(inside) > zone["capacity"] and (arm is None or arm in inside):

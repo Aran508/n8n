@@ -21,7 +21,7 @@ If a step can never fit, for example a clamp parked where the iron must work, th
 | Doweled bracket | 103.8 s | 84.3 s | 19% |
 | Micro-drone | 152.3 s | 76.3 s | 50% |
 | Desk robot head | 119.9 s | 71.7 s | 40% |
-| LED bar | 126.0 s | 87.8 s | 30% |
+| LED bar | 120.7 s | 78.7 s | 35% |
 
 `forge plan <recipe>` prints when each step starts, which arm runs it, how busy each arm is, and the sequential time for comparison. In the simulator, the **All arms at once / One at a time** switch plays both versions, and the per-arm chips show which arms are working, waiting or idle.
 
@@ -48,14 +48,15 @@ The head of the Arduino desk robot with an OLED face, assembled face-up.
 - **Arm 4:** drives the screws, then solders VCC, GND, SCL and SDA.
 - The full robot body has faces that point sideways. That needs a wrist-roll joint, the first upgrade after the prototype.
 
-## LED bar, helping-hands style (`recipes/led_bar.yaml`)
+## LED bar, soldered underneath (`recipes/led_bar.yaml`)
 
-The cell acts as its own helping-hands station.
+Through-hole LEDs, the way you would do them on a helping-hands station: insert from the top, flip, solder underneath.
 
 - **You load:** 64 × 16 mm PCB (kit tray), two LEDs in cup A, two in the side pocket.
 - **Arm 2:** the clamp holds the left end of the board for the whole job.
 - **Arms 1 and 3:** place LEDs from both sides (tweezers and vacuum).
-- **Arm 4:** the iron solders 8 joints, two per LED, starting on each LED as soon as it is in.
+- **Arm 2** releases, then the **flip fixture** turns the board over (every arm must be out of the centre zone while it turns).
+- **Arm 4:** the iron solders all 8 legs on the underside, then the board turns back and arm 1 unloads it.
 
 ## Writing your own project
 

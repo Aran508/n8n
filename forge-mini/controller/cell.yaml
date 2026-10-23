@@ -95,6 +95,11 @@ zones:
   kit_tray: {center: [0, -108],  radius: 32, capacity: 1}
   back:     {center: [0, 108],   radius: 50, capacity: 1}
 
+# Flip fixture: the centre fixture is a trunnion that turns the part 180 deg
+# about the X axis (axis_z above the plate), so arms can work on its underside.
+# A point (x, y, z) on the part ends up at (x, -y, 2 * axis_z - z).
+flipper: {sites: [fixture, drone, bot, led], zone: centre, axis_z: 10, seconds: 1.6}
+
 # Named places: (x, y, z) of the surface the TCP touches.
 locations:
   # fixture and the doweled bracket
@@ -132,21 +137,22 @@ locations:
   bot.pad2:       [-2, 14, 16]
   bot.pad3:       [2, 14, 16]
   bot.pad4:       [6, 14, 16]
-  # LED bar: 64 x 16 mm PCB, the clamp holds the left end like a helping hand
+  # LED bar: 64 x 16 mm PCB, through-hole LEDs; the clamp holds the left end like a helping hand
   led.pcb:        [-8, 0, 2]
   led.hold:       [-35, 0, 2]
   led.l1:         [-10, -3, 7]
   led.l2:         [0, -3, 7]
   led.l3:         [10, -3, 7]
   led.l4:         [20, -3, 7]
-  led.j1a:        [-11.3, 4, 2.5]
-  led.j1b:        [-8.7, 4, 2.5]
-  led.j2a:        [-1.3, 4, 2.5]
-  led.j2b:        [1.3, 4, 2.5]
-  led.j3a:        [8.7, 4, 2.5]
-  led.j3b:        [11.3, 4, 2.5]
-  led.j4a:        [18.7, 4, 2.5]
-  led.j4b:        [21.3, 4, 2.5]
+  # underside after a flip: legs at y = -3 come up at y = +3, PCB bottom (z 0.4) at z 19.6
+  led.bot.j1a:     [-11.27, 3, 20]
+  led.bot.j1b:     [-8.73, 3, 20]
+  led.bot.j2a:     [-1.27, 3, 20]
+  led.bot.j2b:     [1.27, 3, 20]
+  led.bot.j3a:     [8.73, 3, 20]
+  led.bot.j3b:     [11.27, 3, 20]
+  led.bot.j4a:     [18.73, 3, 20]
+  led.bot.j4b:     [21.27, 3, 20]
   # supply points: kit tray (front), side pocket (front-left), parts cups (back)
   kit.plate:      [0, -108, 2]
   kit.part:       [0, -108, 4]

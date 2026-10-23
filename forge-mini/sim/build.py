@@ -13,6 +13,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "controller"))
 
+from forge.budget import JOBS as PRECISION_JOBS, precision_levels  # noqa: E402
 from forge.cli import export_payload, load_recipe  # noqa: E402
 from forge.config import load_cell  # noqa: E402
 from forge.planner import PlanError, Planner  # noqa: E402
@@ -53,6 +54,7 @@ def main():
         data[key + "_seq"] = export(cell, name, "sequential")
         a, s = data[key]["duration"], data[key + "_seq"]["duration"]
         print(f"{name:<18} auto {a:6.1f}s   one-at-a-time {s:6.1f}s   saves {100 * (1 - a / s):3.0f}%")
+    data["precision"] = {"levels": precision_levels(cell), "jobs": [{"job": j, "tol": t} for j, t in PRECISION_JOBS]}
     data["conflict_error"] = rejection(cell, "week2_zone_conflict")
     data["draft_error"] = rejection(cell, "ai_first_draft")
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")

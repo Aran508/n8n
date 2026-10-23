@@ -81,6 +81,31 @@ def play(
     that the probe really touched, and inspect events call `inspector`
     (e.g. forge.vision); a failed check aborts the run.
     """
+    status = link.send({"cmd": "status"})
+    if status.get("door_open"):
+        raise MachineError("the enclosure door is open; close it before starting")
+    if status.get("curtain_broken"):
+        raise MachineError("something is in the loading window (light curtain blocked)")
+    if status.get("estop") or status.get("interlock"):
+        raise MachineError("clear the e-stop / interlock and send reset first")
+    solders = any(e.type == "solder" for e in timeline.events)
+    link.send({"cmd": "light", "on": True})
+    if solders:
+        link.send({"cmd": "fan", "on": True})  # fume extractor while the iron is in use
+    link.send({"cmd": "tower", "state": "run"})
+    try:
+        _play(cell, timeline, link, inspector, log)
+    except MachineError:
+        link.send({"cmd": "tower", "state": "fault"})
+        raise
+    finally:
+        if solders:
+            link.send({"cmd": "fan", "on": False})
+    link.send({"cmd": "tower", "state": "wait"})  # yellow: part ready, waiting for the operator
+    log("done: take the part from the finished tray, then press START or run the next job")
+
+
+def _play(cell, timeline, link, inspector, log) -> None:
     items = [(s.t0, 0, "move", s) for s in timeline.segments]
     items += [(e.t, 1, "event", e) for e in timeline.events]
     items.sort(key=lambda i: (i[0], i[1]))
@@ -125,7 +150,9 @@ def play(
 def _check_events(link: SerialLink, touched: dict[str, float] | None = None) -> None:
     while not link.events.empty():
         ev = link.events.get()
-        if ev["event"] in ("estop", "watchdog"):
+        if ev["event"] in ("estop", "watchdog", "stop"):
             raise MachineError(f"machine stopped: {ev['event']}")
+        if ev["event"] == "interlock":
+            raise MachineError(f"safety interlock: {ev.get('source')} opened while running; close it and send reset")
         if ev["event"] == "probe" and touched is not None:
             touched[f"arm{ev['arm']}"] = time.monotonic()

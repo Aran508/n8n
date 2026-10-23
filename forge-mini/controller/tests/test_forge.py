@@ -148,3 +148,32 @@ def test_soldering_needs_the_iron_and_screws_need_a_hex_bit():
 
 def test_eight_solder_joints_on_the_led_bar():
     assert sum(1 for e in plan(recipe("led_bar")).events if e.type == "solder") == 8
+
+
+def test_flip_lets_the_iron_work_underneath():
+    p = Planner(cell)
+    tl = p.plan(recipe("led_bar"))
+    flips = [e for e in tl.events if e.type == "flip"]
+    solders = [e for e in tl.events if e.type == "solder"]
+    assert len(flips) == 2 and len(solders) == 8
+    assert all(flips[0].t + flips[0].data["dur"] <= s.t <= flips[1].t for s in solders)
+    for f in flips:  # nobody inside the fixture zone while it turns
+        assert p._zone_busy(cell.zones["centre"], f.t, f.t + f.data["dur"]) is None
+
+
+def test_cannot_flip_while_clamped_or_pick_while_flipped():
+    r = recipe("led_bar")
+    steps = [s for s in r["steps"] if "release" not in s]
+    with pytest.raises(PlanError, match="still holding the part"):
+        plan({**r, "steps": steps, "schedule": "sequential"})
+    second_flip = [i for i, s in enumerate(r["steps"]) if "flip" in s][1]
+    with pytest.raises(PlanError, match="upside down"):
+        plan({**r, "steps": r["steps"][:second_flip] + r["steps"][second_flip + 1:]})
+
+
+def test_precision_levels_improve_in_order():
+    from forge.budget import precision_levels
+
+    typical = [lv["typical_mm"] for lv in precision_levels(cell)]
+    assert typical == sorted(typical, reverse=True)
+    assert typical[-1] <= 0.2

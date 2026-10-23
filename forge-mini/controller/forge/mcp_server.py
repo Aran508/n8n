@@ -57,7 +57,10 @@ def describe_cell() -> dict:
         "tool_actions": {"pick/place": "gripper, tweezers or vacuum", "hold": "clamp or gripper",
                          "machine": "spindle + bit", "drive": "spindle + hex bit (screws)",
                          "solder": "iron (list of joint locations)",
-                         "draw": "pen or glue (path of [dx, dy] offsets)", "probe": "probe"},
+                         "draw": "pen or glue (path of [dx, dy] offsets)", "probe": "probe",
+                         "flip": "no arm: the flip fixture turns the part over so arms can work on its underside "
+                                 "(release clamps first; a point (x, y, z) moves to (x, -y, 2*axis_z - z))"},
+        "flipper": cell.raw["flipper"],
         "scheduling": "steps run as early as possible (schedule: auto, the default): write them in a sensible "
                       "order and the planner overlaps work by different arms; set schedule: sequential to disable",
         "locations": cell.raw["locations"],
