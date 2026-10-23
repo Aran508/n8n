@@ -34,8 +34,13 @@ NEEDS = {
     "draw": ("pen", "dispenser"),
     "probe": ("probe",),
     "solder": ("iron",),
+    "trace": ("iron",),
 }
 SAMPLE_S = 0.05  # collision/zone check resolution
+# Steps that put parts in place or change them: nearby work must wait for these.
+# Two solder or trace jobs side by side don't depend on each other (clearance keeps the tools apart).
+ORDERING_ACTIONS = {"pick", "place", "machine", "drive", "hold", "release"}
+PICK_LEAD_S = 8.0  # a pick may start this long before its place step can
 
 
 class PlanError(Exception):
@@ -206,6 +211,20 @@ class Planner:
         x, y, z = loc
         return x, y, z + self.cell.motion["approach_height"]
 
+    def move_travel(self, arm: Arm, loc) -> None:
+        """Move above `loc` at the travel height, or as high as this arm and tool can reach there."""
+        x, y, z = self.cell.location(loc) if isinstance(loc, str) else loc
+        top = self.travel((x, y, z))[2]
+        lock = self.state[arm.name].joints[4]
+        h = top
+        while h > z + 12:
+            try:
+                inverse(self.cell, arm, (x, y, h), self.pitch, lock, self.l3(self.state[arm.name]))
+                break
+            except Unreachable:
+                h -= 4
+        self.move(arm, (x, y, max(h, z + 12)))
+
     def travel(self, loc) -> tuple[float, float, float]:
         """Height for sideways moves between work points: clears other arms' tools at the part."""
         x, y, z = loc
@@ -354,14 +373,15 @@ class Planner:
         if self.items[item].get("flipped"):
             raise PlanError(f"{item} is upside down in the flip fixture; add flip: {{at: {self.items[item]['site']}}} first")
         gripper = self.cell.tools[st.tool].type in ("gripper", "tweezers")
-        self.move(arm, self.travel(loc))
+        self.move_travel(arm, loc)
         if gripper:
             self.signal(arm, "open")
         self.move(arm, loc, speed=40)
         self.signal(arm, "closed" if gripper else "on")
         self._event(st.t, "attach", arm=arm.name, item=item)
         st.holding = item
-        self.move(arm, self.travel(loc))
+        self.move_travel(arm, loc)
+        self.park(arm)  # wait out of the shared zones until the place step can start
 
     def a_place(self, arm: Arm, to, into=None, press=0, stay=False, **_):
         self.need(arm, "place")
@@ -370,7 +390,7 @@ class Planner:
             raise PlanError(f"{arm.name} is not holding anything to place")
         loc = self.cell.location(to)
         gripper = self.cell.tools[st.tool].type in ("gripper", "tweezers")
-        self.move(arm, self.travel(loc))
+        self.move_travel(arm, loc)
         self.move(arm, loc, speed=40)
         if press:
             self.move(arm, (loc[0], loc[1], loc[2] - float(press)), speed=5)
@@ -380,7 +400,7 @@ class Planner:
         self.items[st.holding]["at"] = list(loc)
         self.items[st.holding]["site"] = _site(to)
         st.holding = None
-        self.move(arm, self.travel(loc))
+        self.move_travel(arm, loc)
         if not stay:
             self.park(arm)
 
@@ -417,18 +437,18 @@ class Planner:
         feed = self.cell.motion["feed_mm_s"]
         holes = at if isinstance(at, list) and at and not isinstance(at[0], (int, float)) else [at]
         speed_state = "fast" if bit.kind == "drill" else "slow"
-        self.move(arm, self.travel(self.cell.location(holes[0])))
+        self.move_travel(arm, self.cell.location(holes[0]))
         self.signal(arm, speed_state)
         for ref in holes:
             x, y, z = self.cell.location(ref)
-            self.move(arm, self.travel((x, y, z)))
+            self.move_travel(arm, (x, y, z))
             self.move(arm, (x, y, z + 3))
             t0 = st.t
             self.move(arm, (x, y, z - float(depth)), speed=feed)
             self._event(t0, "cut", arm=arm.name, at=[x, y, z], bit=bit.name, kind=bit.kind, dia=bit.dia,
                         depth=float(depth), dur=round(st.t - t0, 3))
             self.move(arm, (x, y, z + 3), speed=feed * 3)
-            self.move(arm, self.travel((x, y, z)))
+            self.move_travel(arm, (x, y, z))
         self.signal(arm, "off")
         self.park(arm)
 
@@ -446,11 +466,11 @@ class Planner:
         self.need(arm, "solder")
         st = self.state[arm.name]
         joints = at if isinstance(at, list) and at and not isinstance(at[0], (int, float)) else [at]
-        self.move(arm, self.travel(self.cell.location(joints[0])))
+        self.move_travel(arm, self.cell.location(joints[0]))
         self.signal(arm, "heat")
         for ref in joints:
             x, y, z = self.cell.location(ref)
-            self.move(arm, self.travel((x, y, z)))
+            self.move_travel(arm, (x, y, z))
             self.move(arm, (x, y, z + 4))
             self.move(arm, (x, y, z + 0.5), speed=10)
             self.dwell(arm, float(dwell))          # preheat pad and lead
@@ -460,7 +480,33 @@ class Planner:
             self._event(st.t, "solder", arm=arm.name, at=[x, y, z])
             self.dwell(arm, 0.3)                   # let the joint flow
             self.move(arm, (x, y, z + 6), speed=30)
-            self.move(arm, self.travel((x, y, z)))
+            self.move_travel(arm, (x, y, z))
+        self.signal(arm, "off")
+        self.park(arm)
+
+    def a_trace(self, arm: Arm, at, path, speed=4, **_):
+        """Drag-solder a track along a row of perfboard pads ([dx, dy] offsets from `at`).
+
+        Replaces the hand-routed wires of a perfboard build: the iron feeds
+        solder while it slides, bridging pad to pad.
+        """
+        self.need(arm, "trace")
+        st = self.state[arm.name]
+        ox, oy, oz = self.cell.location(at)
+        pts = [(ox + float(dx), oy + float(dy), oz + 0.5) for dx, dy in path]
+        self.move_travel(arm, pts[0])
+        self.signal(arm, "heat")
+        self.move(arm, (pts[0][0], pts[0][1], pts[0][2] + 4))
+        self.move(arm, pts[0], speed=10)
+        self.dwell(arm, 0.8)
+        self.signal(arm, "feed")
+        for a, b in zip(pts, pts[1:]):
+            t0 = st.t
+            self.move(arm, b, speed=float(speed))
+            self._event(t0, "stroke", arm=arm.name, frm=list(a), to=list(b), dur=round(st.t - t0, 3), ink="solder")
+        self.signal(arm, "heat")
+        self.dwell(arm, 0.3)
+        self.move_travel(arm, pts[-1])
         self.signal(arm, "off")
         self.park(arm)
 
@@ -492,12 +538,12 @@ class Planner:
         refs = at if isinstance(at, list) and at and not isinstance(at[0], (int, float)) else [at]
         for ref in refs:
             x, y, z = self.cell.location(ref)
-            self.move(arm, self.travel((x, y, z)))
+            self.move_travel(arm, (x, y, z))
             self.move(arm, (x, y, z + 3))
             self.move(arm, (x, y, z), speed=5)
             measured = z if expect is None else float(expect)
             self._event(st.t, "probe", arm=arm.name, at=[x, y, z], measured=measured, expect=expect, tol=tol, ok=True)
-            self.move(arm, self.travel((x, y, z)))
+            self.move_travel(arm, (x, y, z))
         self.park(arm)
 
     def a_move(self, arm: Arm, to, **_):
@@ -560,6 +606,37 @@ class Planner:
         self.blocked.append((start, start + dur, spec["zone"]))
         return dur
 
+    def c_flash(self, at, firmware="firmware.bin", start=0.0, **_):
+        """Slide the USB-C programming dock into the board, flash it and run its self-test."""
+        spec = self.cell.raw["programmer"]
+        site = _site(at)
+        if any(it.get("site") == site and it.get("flipped") for it in self.items.values()):
+            raise PlanError(f"the part on {site} is upside down; flip it back so the dock can reach its USB-C port")
+        dur = float(spec["seconds"])
+        zone = self.cell.zones[spec["zone"]]
+        busy = self._zone_busy(zone, start, start + dur)
+        if busy:
+            raise PlanError(f"{', '.join(busy[1])} would be inside the fixture zone at t={busy[0]:.2f}s while the dock is plugged in")
+        self._event(start, "flash", site=site, firmware=firmware, dur=dur)
+        self.blocked.append((start, start + dur, spec["zone"]))
+        return dur
+
+    def c_operator(self, message, seconds=30, start=0.0, **_):
+        """A job for a person (battery plug, strap). Every arm stays still until START is pressed."""
+        dur = float(seconds)
+        self._event(start, "operator", message=message, dur=dur)
+        self.blocked.append((start, start + dur, "*"))
+        return dur
+
+    def _cell_dur(self, action: str, params: dict) -> float:
+        if action == "flip":
+            return float(self.cell.raw["flipper"]["seconds"])
+        if action == "flash":
+            return float(self.cell.raw["programmer"]["seconds"])
+        if action == "operator":
+            return float(params.get("seconds", 30))
+        return 0.0
+
     def _zone_busy(self, zone: dict, t_a: float, t_b: float):
         """First (time, arms) in [t_a, t_b] with any arm's tool tip inside `zone`."""
         n = int(max(0.0, t_b - t_a) / SAMPLE_S) + 1
@@ -571,9 +648,9 @@ class Planner:
         return None
 
     # ---------- driver ----------
-    ARM_ACTIONS = {"pick", "place", "hold", "release", "machine", "drive", "solder", "draw", "probe", "move",
-                   "park", "calibrate", "tool_change", "bit_change"}
-    CELL_ACTIONS = {"inspect", "wait", "flip"}
+    ARM_ACTIONS = {"pick", "place", "hold", "release", "machine", "drive", "solder", "trace", "draw", "probe",
+                   "move", "park", "calibrate", "tool_change", "bit_change"}
+    CELL_ACTIONS = {"inspect", "wait", "flip", "flash", "operator"}
 
     def _run_one(self, action: str, params: dict, start: float) -> float:
         params = {("frm" if k == "from" else k): v for k, v in (params or {}).items()}
@@ -610,6 +687,10 @@ class Planner:
         schedule: sequential runs steps strictly one after another (with
         explicit `parallel` blocks), which is what the auto mode is compared to.
         """
+        if recipe.get("locations"):  # part positions that belong to this product only
+            self.cell = copy.copy(self.cell)
+            self.cell.locations = {**self.cell.locations,
+                                   **{k: tuple(float(c) for c in v) for k, v in recipe["locations"].items()}}
         for name, spec in (recipe.get("items") or {}).items():
             pos = list(self.cell.location(spec["at"]))
             self.items[name] = {"at": pos, "site": _site(spec["at"])}
@@ -705,7 +786,7 @@ class Planner:
             barrier.add(self.items[item]["site"])  # lifting a part out: everything on it must be finished
         if action == "place" and not params.get("into"):
             barrier |= {_site(r) for r in refs}     # a new base part lands: earlier work there must be gone
-        if action in ("hold", "inspect", "flip"):
+        if action in ("hold", "inspect", "flip", "flash"):
             barrier |= sites
         if action == "release" and arm in self._hold_site:
             barrier.add(self._hold_site[arm])
@@ -743,25 +824,31 @@ class Planner:
         self._hold_site: dict[str, str] = {}
         done: list[tuple] = []  # (excl, sites, barrier, points, end)
         near = float(self.cell.raw.get("clearance", 0))
-        for idx, action, params, label in self._flatten(steps):
+        flat = self._flatten(steps)
+        hands_off_until = 0.0  # nothing at all starts while a person is working in the cell
+        for pos, (idx, action, params, label) in enumerate(flat):
             arm = params.get("arm") if action in self.ARM_ACTIONS else None
             if arm:
                 self._arm(arm)
             excl, sites, barrier, points = self._resources(action, params)
             earliest = 0.0
-            for e2, s2, b2, p2, end in done:
-                close = any(sa == sb and math.dist(pa, pb) < near for sa, pa in points for sb, pb in p2)
+            for e2, s2, b2, p2, end, act2 in done:
+                close = (action in ORDERING_ACTIONS or act2 in ORDERING_ACTIONS) and any(
+                    sa == sb and math.dist(pa, pb) < near for sa, pa in points for sb, pb in p2)
                 if (excl & e2) or (barrier & s2) or (b2 & sites) or close:
                     earliest = max(earliest, end)  # work on the same spot keeps recipe order
-            if action == "wait":
-                earliest = max([earliest] + [d[4] for d in done])
+            if action in ("wait", "operator"):
+                earliest = max([earliest] + [d[4] for d in done] + [st.t for st in self.state.values()])
+            earliest = max(earliest, hands_off_until)
+            if action == "pick":  # don't grab a part long before it can be placed
+                earliest = max(earliest, self._place_ready(flat, pos, params, done, near) - PICK_LEAD_S)
             if arm:
                 earliest = max(earliest, self.state[arm].t)
             start, tries, last = earliest, 0, None
             horizon = max([earliest] + [d[4] for d in done]) + 120
-            if action == "flip":  # wait until every arm is out of the fixture zone for the whole turn
-                zone = self.cell.zones[self.cell.raw["flipper"]["zone"]]
-                dur = float(self.cell.raw["flipper"]["seconds"])
+            if action in ("flip", "flash"):  # wait until every arm is out of the fixture zone for the whole job
+                zone = self.cell.zones["centre"]
+                dur = self._cell_dur(action, params)
                 while self._zone_busy(zone, start, start + dur):
                     start += 0.25
                     if start > horizon:
@@ -785,8 +872,27 @@ class Planner:
             self.timeline.events.append(Event(round(start, 3), "step", {"index": idx, "label": label, "arm": arm, "end": round(end, 3)}))
             if action == "hold":
                 self._hold_site[arm] = next(iter(sites), None)
-            done.append((excl, sites, barrier, points, end))
+            if action == "operator":
+                hands_off_until = end
+            done.append((excl, sites, barrier, points, end, action))
             self.clock = max(self.clock, end)
+
+    def _place_ready(self, flat, pos, pick_params, done, near) -> float:
+        """Earliest time the place step that follows this pick could start (ignoring its arm)."""
+        arm, item = pick_params.get("arm"), pick_params.get("item")
+        for _, action, params, _ in flat[pos + 1:]:
+            if params.get("arm") != arm:
+                continue
+            if action != "place":
+                return 0.0
+            excl, sites, barrier, points = self._resources(action, {**params, "item": item})
+            ready = 0.0
+            for e2, s2, b2, p2, end, act2 in done:
+                close = any(sa == sb and math.dist(pa, pb) < near for sa, pa in points for sb, pb in p2)
+                if (excl & e2) or (barrier & s2) or (b2 & sites) or close:
+                    ready = max(ready, end)
+            return ready
+        return 0.0
 
     # ---------- collision and zone checks ----------
     def _pose_at(self, arm: str, t: float):
@@ -805,11 +911,12 @@ class Planner:
         """First time in [t_a, t_b] where `arm` (or any arm when None) breaks clearance or a zone."""
         clear = float(self.cell.raw.get("clearance", 0))
         names = list(self.state)
-        n = int(max(0.0, t_b - t_a) / SAMPLE_S) + 1
+        # sample on one global grid so a step check and the final whole-plan check see the same instants
+        k0, k1 = math.floor(t_a / SAMPLE_S), math.ceil(t_b / SAMPLE_S)
         # pre-split the tracks for fast lookups
         starts = {a: [r[0] for r in self.track[a]] for a in names}
-        for k in range(n + 1):
-            t = min(t_a + k * SAMPLE_S, t_b)
+        for k in range(k0, k1 + 1):
+            t = k * SAMPLE_S
             poses = {}
             for a in names:
                 tr = self.track[a]
@@ -828,10 +935,17 @@ class Planner:
                 if d < clear:
                     return t, f"{a} and {b} come within {d:.0f} mm at t={t:.2f}s (clearance {clear:.0f} mm)"
             for b0, b1, zn in self.blocked:
-                if b0 <= t <= b1:
-                    inside = [a for a in names if in_zone(self.cell.zones[zn], poses[a][0]) and (arm is None or a == arm)]
-                    if inside:
-                        return t, f"{', '.join(inside)} would be in the {zn} zone at t={t:.2f}s while the fixture flips"
+                if not b0 <= t <= b1:
+                    continue
+                if zn == "*":  # a person is working in the cell: no arm may move at all
+                    moving = [a for a in names if (arm is None or a == arm) and self.track[a]
+                              and (i := bisect.bisect_right(starts[a], t) - 1) >= 0 and t < self.track[a][i][1] - 1e-9]
+                    if moving:
+                        return t, f"{', '.join(moving)} would move at t={t:.2f}s while a person works in the cell"
+                    continue
+                inside = [a for a in names if in_zone(self.cell.zones[zn], poses[a][0]) and (arm is None or a == arm)]
+                if inside:
+                    return t, f"{', '.join(inside)} would be in the {zn} zone at t={t:.2f}s while the fixture is busy"
             for zn, zone in self.cell.zones.items():
                 inside = [a for a in names if in_zone(zone, poses[a][0])]
                 if len(inside) > zone["capacity"] and (arm is None or arm in inside):

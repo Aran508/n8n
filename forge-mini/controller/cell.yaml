@@ -58,11 +58,14 @@ tools:
               signal: {off: 0, heat: 60, feed: 150}}
   glue:      {type: dispenser, rack: rack_R, slot: [100, -36], length: 48, mass: 24, id_ohms: 15000,
               signal: {stop: 90, push: 140}}
+  iron_B:    {type: iron,    rack: rack_B, slot: [0,    90], length: 52, mass: 34, id_ohms: 22000,
+              signal: {off: 0, heat: 60, feed: 150}}
 
 # Racks are shelves with holes; tools hang through them like a reamer stand.
 racks:
   rack_L: {z: 40, arms: [arm1, arm3]}
   rack_R: {z: 40, arms: [arm2, arm4]}
+  rack_B: {z: 40, arms: [arm1, arm2]}   # one-slot stand at the back for the second iron
 
 # Bits for the spindle, standing shank-up in a block (the "reamer set").
 # stickout = collet face -> cutting tip. strip = direction the spindle slides
@@ -98,7 +101,11 @@ zones:
 # Flip fixture: the centre fixture is a trunnion that turns the part 180 deg
 # about the X axis (axis_z above the plate), so arms can work on its underside.
 # A point (x, y, z) on the part ends up at (x, -y, 2 * axis_z - z).
-flipper: {sites: [fixture, drone, bot, led], zone: centre, axis_z: 10, seconds: 1.6}
+flipper: {sites: [fixture, drone, bot, led, watch], zone: centre, axis_z: 10, seconds: 1.6}
+
+# USB-C programming dock on the fixture: a servo slide pushes a USB-C plug into
+# the product's port, the Pi flashes firmware and runs the product's self-test.
+programmer: {zone: centre, seconds: 20, servo: dock}
 
 # Named places: (x, y, z) of the surface the TCP touches.
 locations:
@@ -139,7 +146,7 @@ locations:
   bot.pad4:       [6, 14, 16]
   # LED bar: 64 x 16 mm PCB, through-hole LEDs; the clamp holds the left end like a helping hand
   led.pcb:        [-8, 0, 2]
-  led.hold:       [-35, 0, 2]
+  led.hold:       [-38, -2, 2]
   led.l1:         [-10, -3, 7]
   led.l2:         [0, -3, 7]
   led.l3:         [10, -3, 7]

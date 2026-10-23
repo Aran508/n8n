@@ -177,3 +177,31 @@ def test_precision_levels_improve_in_order():
     typical = [lv["typical_mm"] for lv in precision_levels(cell)]
     assert typical == sorted(typical, reverse=True)
     assert typical[-1] <= 0.2
+
+
+def test_smartwatch_plans_with_flips_flash_and_operator():
+    p = Planner(cell)
+    tl = p.plan(recipe("smartwatch"))
+    kinds = [e.type for e in tl.events]
+    assert kinds.count("flip") == 4 and kinds.count("flash") == 1 and kinds.count("operator") == 1
+    assert kinds.count("solder") == 43
+    assert p._first_conflict(0, tl.duration, None) is None
+    op = next(e for e in tl.events if e.type == "operator")
+    for arm, track in p.track.items():  # nobody moves while the person works in the cell
+        assert not any(t0 < op.t + op.data["dur"] - 1e-3 and t1 > op.t + 1e-3 for t0, t1, *_ in track), arm
+    later = [e for e in tl.events if e.type in ("flip", "flash", "step") and e.t > op.t - 1e-9 and e is not op
+             and not (e.type == "step" and "battery" in e.data["label"])]
+    assert all(e.t >= op.t + op.data["dur"] - 1e-6 for e in later)  # the fixture doesn't move under your hands either
+
+
+def test_two_irons_solder_at_the_same_time():
+    tl = plan(recipe("smartwatch"))
+    s4 = [e.t for e in tl.events if e.type == "solder" and e.data["arm"] == "arm4"]
+    s2 = [e.t for e in tl.events if e.type == "solder" and e.data["arm"] == "arm2"]
+    assert s2 and s4 and min(s2) < max(s4) and min(s4) < max(s2)
+
+
+def test_flash_needs_the_part_upright():
+    r = {"items": {"pcb": {"at": "led.pcb", "kind": "pcb"}}, "steps": [{"flip": {"at": "led"}}, {"flash": {"at": "led"}}]}
+    with pytest.raises(PlanError, match="upside down"):
+        plan(r)

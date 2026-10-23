@@ -618,6 +618,26 @@ const STAGES = [
       <div class="done"><b>Watch for</b> the board turning over with the LED legs pointing up, the silver joints appearing on the underside, and the board turning back.</div>
       <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
   },
+  {
+    id: 'watch', wk: 'Project', proj: true, name: 'Smartwatch (your video)', data: DATA.watch, seq: DATA.watch_seq, cam: [110, 250, 290], show: { arms: null, racks: ['rack_L', 'rack_R', 'rack_B'], bits: true, trays: true, pads: false },
+    html: () => `
+      <div><div class="eyebrow">Project</div><h2>Perfboard smartwatch</h2></div>
+      <p class="goal">The ESP32-C3 watch from your video: a 40 × 40 mm perfboard, USB-C charger, 0.96" OLED, three buttons, a P-MOSFET power switch and a LiPo. The cell builds everything except the battery plug and the strap.</p>
+      <div><h4>Can each step of the video be done here?</h4>
+      <table class="flow"><tbody>
+        <tr><td>Place ESP32, buttons, resistor, MOSFET, sockets</td><td><b style="color:var(--ok)">Cell</b> vacuum, gripper and tweezers, pressed into the holes</td></tr>
+        <tr><td>Solder every leg</td><td><b style="color:var(--ok)">Cell</b> flip fixture + <b>two irons at once</b>: 39 legs underneath, 4 charger pads on top</td></tr>
+        <tr><td>Hand-routed wires underneath</td><td><b style="color:var(--ok)">Cell, redesigned</b> as 7 drag-soldered tracks (or order a small PCB)</td></tr>
+        <tr><td>Stack the OLED</td><td><b style="color:var(--ok)">Cell</b> 4-pin socket, OLED pressed in from above</td></tr>
+        <tr><td>Flash and test</td><td><b style="color:var(--ok)">Cell</b> USB-C dock slides in, Pi flashes, camera checks the watch face</td></tr>
+        <tr><td>Back cover</td><td><b style="color:var(--ok)">Cell</b> flip again, cover on standoffs, 2 M2 screws driven from below</td></tr>
+        <tr><td>Plug in the battery</td><td><b style="color:var(--accent)">You, 30 s</b> a flexible lead; the arms freeze, the tower goes yellow, press START when done</td></tr>
+        <tr><td>Velcro strap</td><td><b style="color:var(--accent)">You</b> soft material, threaded by hand</td></tr>
+        <tr><td>ESP32 header pins</td><td>buy the module with headers already soldered</td></tr>
+      </tbody></table></div>
+      <div class="done"><b>Precision:</b> 2.54 mm-pitch joints need the smart-servo + camera upgrade (±0.15 mm typical; see "Can it do tiny work?" below). The hobby-servo prototype can rehearse the whole sequence on a dummy board.</div>
+      <div><h4>Timeline</h4><ul class="steps" id="steps"></ul></div>`,
+  },
 ];
 
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
@@ -716,6 +736,10 @@ const pads = new THREE.Group(); world.add(pads);
 for (const k of ['cal_a', 'cal_b']) { const [x, y] = CELL.locations[k]; const p = box(20, 1, 20, mat('--accent', { roughness: 0.9 })); p.position.copy(W(x, y, BOARD_TOP + 0.5)); pads.add(p); }
 { const [x, y] = CELL.locations.cal_square; const p = box(54, 13, 54, mat('--plate', { roughness: 0.95 })); p.position.copy(W(x, y, BOARD_TOP + 6.5)); pads.add(p); }
 
+// USB-C programming dock: a plug on a servo slide behind the fixture
+const dock = new THREE.Group(); world.add(dock);
+dock.add(box(9, 3.2, 8, mat('--steel', { metalness: 0.7 }), 0, 0, 4)); dock.add(box(14, 8, 10, mat('--servo'), 0, 0, -4));
+
 // ---------- miniature robot cell: enclosure, door, light curtain, tower, panel ----------
 const ENC = { x0: -205, x1: 205, y0: -205, y1: 205, top: 330 };
 const FLOOR = BOARD_TOP - 8;
@@ -748,7 +772,7 @@ const doorPivot = new THREE.Group(); doorPivot.position.copy(W(ENC.x1, ENC.y0, F
   const hd = box(4, 40, 6, mat('--servo')); hd.position.set(-(ENC.x1 - 60), H / 2, -6); doorPivot.add(hd); }
 // loading window: light curtain posts and beams, loader drawer with ID tag
 const curtainMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.6 });
-for (const x of [-46, 46]) encBox(6, 90, 6, mat('--servo'), x, ENC.y0 - 4, FLOOR + 45);
+for (const x of [-46, 46]) encBox(6, 90, 6, mat('--servo'), x, ENC.y0 - 4, FLOOR + 45, ['front']);
 const beams = [];
 for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(86, 0.8, 0.8), curtainMat); b.position.copy(W(0, ENC.y0 - 4, FLOOR + 14 + i * 13)); enclosure.add(b); beams.push(b); }
 for (const x of [-30, 30]) encBox(3, 3, 140, extr, x, -175, -11);
@@ -904,6 +928,23 @@ const ITEM_SPECS = {
     for (const x of [-5, 5]) g.add(box(4, 0.3, 2.4, basic('--eye'), x, 1.35, -2));
     g.add(box(5, 0.3, 0.8, basic('--eye'), 0, 1.35, 2.5)); return g; } },
   screw: { h: 6, make: () => { const g = new THREE.Group(); const sh = cyl(1, 5, mat('--steel', { metalness: 0.7 }), 8); sh.position.y = -0.5; g.add(sh); const hd = cyl(1.9, 1.4, mat('--steel', { metalness: 0.7 }), 12); hd.position.y = 2.3; g.add(hd); return g; } },
+  perfboard: { h: 1.6, make: () => { const g = new THREE.Group(); g.add(box(40, 1.6, 40, mat('--pcb', { roughness: 0.6 })));
+    const dots = new THREE.Mesh(new THREE.PlaneGeometry(37, 37), mat('--steel', { metalness: 0.6, transparent: true, opacity: 0.35 })); dots.rotation.x = -Math.PI / 2; dots.position.y = 0.82; g.add(dots); return g; } },
+  esp32c3: { h: 5, make: () => { const g = new THREE.Group(); g.add(box(22, 1.2, 18, mat('--servo'), 0, -1.6, 0)); g.add(box(4.5, 1, 4.5, mat('--toolbody'), -2, -0.5, 0));
+    g.add(box(9, 3.2, 7.4, mat('--steel', { metalness: 0.7 }), 0, -0.9, -6)); for (const z of [-7.6, 7.6]) g.add(box(20.3, 2.5, 2.5, mat('--servo'), 0, -3.4, z)); return g; } },
+  charger: { h: 3.2, make: () => { const g = new THREE.Group(); g.add(box(10, 1.2, 12, mat('--oled'), 0, -1, 0)); g.add(box(9, 3.2, 7.4, mat('--steel', { metalness: 0.7 }), 0, 0, -4)); return g; } },
+  button: { h: 5, make: () => { const g = new THREE.Group(); g.add(box(12, 3.4, 12, mat('--servo'), 0, -0.8, 0)); const cap = cyl(3.4, 1.6, mat('--servo', { roughness: 0.3 }), 18); cap.position.y = 1.7; g.add(cap); return g; } },
+  resistor: { h: 2, make: () => { const g = new THREE.Group(); const r = cyl(0.9, 6, mat('--part'), 10); r.rotation.z = Math.PI / 2; g.add(r); return g; } },
+  mosfet: { h: 4, make: () => box(4, 4, 2, mat('--servo')) },
+  header: { h: 8.5, make: () => box(10.2, 8.5, 2.5, mat('--servo')) },
+  jst: { h: 4, make: () => box(6, 4, 4.5, mat('--plate')) },
+  oled_watch: { h: 3, make: () => { const g = new THREE.Group(); g.add(box(27, 1.6, 27, mat('--oled'), 0, -0.7, 0));
+    const scr = new THREE.MeshStandardMaterial({ color: 0x05080c, emissive: 0x000000 }); g.add(box(25, 1.2, 15, scr, 0, 0.6, -1));
+    const face = new THREE.Group(); face.visible = false; g.add(face); g.userData.face = face;
+    const digit = new THREE.MeshBasicMaterial({ color: 0x5fd8ff });
+    for (const [x, w, d, z] of [[-8, 2, 7, -1.5], [-5, 4, 7, -1.5], [0.5, 1, 7, -1.5], [4, 4, 7, -1.5], [8.5, 4, 7, -1.5], [0, 16, 1, 4]]) {
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), digit); seg.position.set(x, 1.3, z); face.add(seg); }
+    return g; } },
   pcb:   { h: 1.6, make: () => { const g = new THREE.Group(); g.add(box(64, 1.6, 16, mat('--pcb', { roughness: 0.5 })));
     for (let i = 0; i < 8; i++) { const p = cyl(0.9, 0.3, mat('--steel', { metalness: 0.8 }), 10); p.position.set(-11.3 + 8 + (i >> 1) * 10 + (i & 1) * 2.6, 0.9, -4); g.add(p); } return g; } },
   led:   { h: 5, make: () => { const g = new THREE.Group(); const m = mat('--bad', { roughness: 0.3, transparent: true, opacity: 0.85 });
@@ -924,7 +965,7 @@ function buildItems(data) {
   }
   // marks, holes and joints ride on whatever part they were made on; ones made
   // while the part was upside down are stored in the part's upright frame
-  const upright = (t, p) => (Math.round(flipAll(t) / Math.PI) % 2 ? [p[0], 2 * (FLIP.center ? FLIP.center[1] : 0) - p[1], 2 * FLIP.axis_z - p[2]] : p);
+  const upright = uprightAt;
   const cellPos = (st, n, d = 0) => { const s = st[n]; if (!s || d > 4) return null; if (s.mode === 'at') return s.pos;
     if (s.mode === 'child') { const p = cellPos(st, s.parent, d + 1); return p && [p[0] + s.off[0], p[1] + s.off[1], p[2] + s.off[2]]; } return null; };
   const ownerAt = (t, p) => { const st = itemStates(t, data); let best = null, bestD = 1e9;
@@ -934,7 +975,7 @@ function buildItems(data) {
   for (const e of data.events) {
     if (e.type === 'stroke') {
       const a = upright(e.t, e.data.frm), b = upright(e.t, e.data.to), len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      const mesh = box(len, 0.4, 1.1, mat(e.data.ink === 'glue' ? '--plate' : '--ink-pen', { roughness: 0.9 }));
+      const mesh = box(len, 0.4, e.data.ink === 'solder' ? 1.3 : 1.1, mat(e.data.ink === 'glue' ? '--plate' : e.data.ink === 'solder' ? '--steel' : '--ink-pen', { roughness: e.data.ink === 'solder' ? 0.2 : 0.9, metalness: e.data.ink === 'solder' ? 0.9 : 0.05 }));
       mesh.geometry.translate(len / 2, 0, 0); mesh.castShadow = false;
       const o = ownerAt(e.t, a);
       strokes.push({ e, a, b, len, mesh, owner: o && o.n, off: o ? [a[0] - o.s.pos[0], a[1] - o.s.pos[1], a[2] - o.s.pos[2]] : null }); world.add(mesh);
@@ -987,7 +1028,7 @@ function itemStates(tt, d = data) {
     if (e.type === 'spawn') st[x.item] = { mode: 'at', pos: x.pos };
     else if (e.type === 'attach') st[x.item] = { mode: 'held', arm: x.arm };
     else if (e.type === 'detach') {
-      if (x.into && st[x.into] && st[x.into].pos) { const pp = st[x.into].pos; st[x.item] = { mode: 'child', parent: x.into, off: [x.pos[0] - pp[0], x.pos[1] - pp[1], x.pos[2] - pp[2]] }; }
+      if (x.into && st[x.into] && st[x.into].pos) { const pp = st[x.into].pos, q = uprightAt(e.t, x.pos); st[x.item] = { mode: 'child', parent: x.into, off: [q[0] - pp[0], q[1] - pp[1], q[2] - pp[2]] }; }
       else st[x.item] = { mode: 'at', pos: x.pos };
     }
   }
@@ -1010,6 +1051,8 @@ const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
 let flips = [];
 const XAXIS = new THREE.Vector3(1, 0, 0);
 function flipProgress(f, tt) { return Math.min(1, Math.max(0, (tt - f.t) / f.data.dur)); }
+function uprightAt(t, p) { return Math.round(flipAll(t) / Math.PI) % 2 ? [p[0], 2 * (FLIP.center ? FLIP.center[1] : 0) - p[1], 2 * FLIP.axis_z - p[2]] : p; }
+function rootOf(st, n) { let k = 0; while (st[n] && st[n].mode === 'child' && k++ < 6) n = st[n].parent; return n; }
 function flipAll(tt) { let a = 0; for (const f of flips) a += Math.PI * flipProgress(f, tt); return a; }
 function flipFor(name, tt) { let a = 0; for (const f of flips) if (name && f.data.items.includes(name)) a += Math.PI * flipProgress(f, tt); return a; }
 function applyFlip(mesh, ang, baseQuat) {
@@ -1068,7 +1111,11 @@ function update(tt) {
 
   const st = itemStates(tt);
   const itemPos = {};
-  for (const [name, mesh] of Object.entries(itemMeshes)) { const p = resolveItem(st, ms, name); itemPos[name] = p; mesh.visible = !!p; if (p) { mesh.position.copy(p); applyFlip(mesh, flipFor(name, tt)); } }
+  for (const [name, mesh] of Object.entries(itemMeshes)) { const p = resolveItem(st, ms, name); itemPos[name] = p; mesh.visible = !!p; if (p) { mesh.position.copy(p); applyFlip(mesh, flipFor(rootOf(st, name), tt)); } }
+  const flashed = data.events.find(e => e.type === 'flash' && tt >= e.t + e.data.dur * 0.8);
+  for (const mesh of Object.values(itemMeshes)) { const f = mesh.children[0]?.userData?.face; if (f) f.visible = !!flashed; }
+  const fe = data.events.find(e => e.type === 'flash' && tt >= e.t - 0.2 && tt <= e.t + e.data.dur);
+  dock.position.copy(W(-3, fe ? 21 : 34, 6.5));
   cradle.rotation.x = flipAll(tt);
   for (const s of strokes) {
     const f = Math.max(0, Math.min(1, (tt - s.e.t) / Math.max(s.e.data.dur, 1e-3)));
@@ -1076,7 +1123,7 @@ function update(tt) {
     if (!s.mesh.visible) continue;
     const base = s.owner && itemPos[s.owner] ? itemPos[s.owner].clone().add(new THREE.Vector3(s.off[0], s.off[2], -s.off[1])) : W(...s.a);
     s.mesh.position.copy(base).add(new THREE.Vector3(0, 0.25, 0));
-    applyFlip(s.mesh, flipFor(s.owner, tt), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]), 0)));
+    applyFlip(s.mesh, flipFor(rootOf(st, s.owner), tt), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0]), 0)));
     s.mesh.scale.x = Math.max(f, 0.001);
   }
   for (const b of blobs) {
@@ -1084,14 +1131,14 @@ function update(tt) {
     if (!b.mesh.visible) continue;
     const base = b.owner && itemPos[b.owner] ? itemPos[b.owner].clone().add(new THREE.Vector3(b.off[0], b.off[2], -b.off[1])) : W(...b.p);
     b.mesh.position.copy(base).add(new THREE.Vector3(0, b.under ? -0.5 : 0.5, 0));
-    applyFlip(b.mesh, flipFor(b.owner, tt));
+    applyFlip(b.mesh, flipFor(rootOf(st, b.owner), tt));
   }
   for (const h of holes) {
     h.mesh.visible = tt >= h.e.t + h.e.data.dur * 0.6;
     if (!h.mesh.visible) continue;
     const base = h.owner && itemPos[h.owner] ? itemPos[h.owner].clone().add(new THREE.Vector3(h.off[0], h.off[2], -h.off[1])) : W(...h.p);
     h.mesh.position.copy(base).add(new THREE.Vector3(0, 0.2, 0));
-    applyFlip(h.mesh, flipFor(h.owner, tt), Q_HOLE);
+    applyFlip(h.mesh, flipFor(rootOf(st, h.owner), tt), Q_HOLE);
   }
 
   // zones
@@ -1122,6 +1169,9 @@ function update(tt) {
   const insp = data.events.find(e => e.type === 'inspect' && tt >= e.t && tt <= e.t + 0.8);
   if (insp) chips.push(`<span class="chip ok">camera: ${esc(insp.data.check)} ✓</span>`);
   if (fault) chips.unshift(`<span class="chip bad">STOP · ${fault === 'door' ? 'door opened' : 'hand in the loading window'} · arms and tools frozen</span>`);
+  const opr = data.events.find(e => e.type === 'operator' && tt >= e.t && tt <= e.t + e.data.dur);
+  if (opr) chips.unshift(`<span class="chip live">YOU · ${esc(opr.data.message)}</span>`);
+  if (fe) chips.push(`<span class="chip live">USB-C dock: flashing ${esc(fe.data.firmware)}</span>`);
   const fl = flips.find(f => tt >= f.t && tt <= f.t + f.data.dur);
   if (fl) chips.push(`<span class="chip live">flip fixture turning</span>`);
   const html = chips.join('') + '|' + (cur ? cur.data.index : '') + '|' + fault;
@@ -1156,6 +1206,7 @@ function schedPanel(s) {
     <p class="note">Bars show how much of the job each arm spends moving, using a tool or holding. Switch to "One at a time" to see the idle arms the scheduler removes.</p></div>`;
 }
 function setStage(s, keepHash) {
+  if (s !== stage && canvas.clientWidth >= 560) { camera.position.set(...(s.cam || [240, 400, 560])); controls.target.set(0, s.cam ? 10 : 30, 0); }
   stage = s; data = mode === 'seq' && s.seq ? s.seq : s.data; index(data); buildItems(data);
   const armsOn = Object.keys(data.cell.arms);
   for (const [name, arm] of Object.entries(ARMS)) arm.root.visible = armsOn.includes(name);
@@ -1194,7 +1245,10 @@ function resize() {
 }
 let last = performance.now();
 let fault = null, doorAngle = 0;
-function towerState() { return fault ? 'red' : (!playing || t >= data.duration) ? 'yellow' : 'green'; }
+function towerState() {
+  const opr = data.events.find(e => e.type === 'operator' && t >= e.t && t <= e.t + e.data.dur);
+  return fault ? 'red' : (!playing || t >= data.duration || opr) ? 'yellow' : 'green';
+}
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   resize();

@@ -73,6 +73,7 @@ def play(
     link: SerialLink,
     inspector: Callable[[dict], bool] | None = None,
     log: Callable[[str], None] = print,
+    flasher: Callable[[dict], bool] | None = None,
 ) -> None:
     """Send every segment and tool signal at its planned time.
 
@@ -94,7 +95,7 @@ def play(
         link.send({"cmd": "fan", "on": True})  # fume extractor while the iron is in use
     link.send({"cmd": "tower", "state": "run"})
     try:
-        _play(cell, timeline, link, inspector, log)
+        _play(cell, timeline, link, inspector, log, flasher)
     except MachineError:
         link.send({"cmd": "tower", "state": "fault"})
         raise
@@ -105,15 +106,17 @@ def play(
     log("done: take the part from the finished tray, then press START or run the next job")
 
 
-def _play(cell, timeline, link, inspector, log) -> None:
+def _play(cell, timeline, link, inspector, log, flasher=None) -> None:
     items = [(s.t0, 0, "move", s) for s in timeline.segments]
     items += [(e.t, 1, "event", e) for e in timeline.events]
     items.sort(key=lambda i: (i[0], i[1]))
 
     touched: dict[str, float] = {}
     t_start = time.monotonic()
+    offset = 0.0  # how far the real run has drifted from the plan (people, flashing)
+    flips = 0
     for t, _, kind, obj in items:
-        wait = t_start + t - time.monotonic()
+        wait = t_start + t + offset - time.monotonic()
         if wait > 0:
             time.sleep(wait)
         _check_events(link, touched)
@@ -143,6 +146,36 @@ def _play(cell, timeline, link, inspector, log) -> None:
         elif e.type == "inspect" and inspector is not None:
             if not inspector(d):
                 raise MachineError(f"inspection failed: {d.get('check')} at {d.get('at')}")
+        elif e.type == "flip":
+            flips += 1
+            link.send({"cmd": "aux", "name": "flip", "deg": 180 if flips % 2 else 0, "ms": int(d["dur"] * 1000)})
+        elif e.type == "flash":
+            t0 = time.monotonic()
+            link.send({"cmd": "aux", "name": "dock", "deg": 160, "ms": 800})  # push the USB-C plug in
+            time.sleep(1.0)
+            try:
+                if flasher is not None and not flasher(d):
+                    raise MachineError(f"flashing {d['firmware']} or its self-test failed")
+            finally:
+                link.send({"cmd": "aux", "name": "dock", "deg": 0, "ms": 800})
+                time.sleep(0.9)
+            offset += max(0.0, time.monotonic() - t0 - d["dur"])
+        elif e.type == "operator":
+            t0 = time.monotonic()
+            link.send({"cmd": "tower", "state": "wait"})
+            log(f"OPERATOR: {d['message']}")
+            touched.pop("_start", None)
+            while True:
+                _check_events(link, touched)
+                if "_start" in touched:
+                    st = link.send({"cmd": "status"})
+                    if not st.get("door_open") and not st.get("curtain_broken"):
+                        break
+                    log("close the door and clear the window, then press START again")
+                    touched.pop("_start", None)
+                time.sleep(0.1)
+            link.send({"cmd": "tower", "state": "run"})
+            offset += (time.monotonic() - t0) - d["dur"]
     time.sleep(0.5)
     _check_events(link, touched)
 
@@ -154,5 +187,7 @@ def _check_events(link: SerialLink, touched: dict[str, float] | None = None) -> 
             raise MachineError(f"machine stopped: {ev['event']}")
         if ev["event"] == "interlock":
             raise MachineError(f"safety interlock: {ev.get('source')} opened while running; close it and send reset")
+        if ev["event"] == "start" and touched is not None:
+            touched["_start"] = time.monotonic()
         if ev["event"] == "probe" and touched is not None:
             touched[f"arm{ev['arm']}"] = time.monotonic()

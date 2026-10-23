@@ -1,6 +1,6 @@
 # Forge Mini
 
-A desktop micro-factory prototype: four small servo arms around one work plate. Each arm has an automatic tool changer and shares two tool racks and a reamer and bit block with its neighbours. A scheduler keeps all four arms working at once. A flip fixture lets the arms work on the underside of a part. It builds small DIY electronics, such as a micro-drone, a desk robot head with an OLED face and an LED bar soldered underneath. It sits inside a miniature robot cell with a door interlock, light curtain, tower light and control panel, and Claude, or any MCP client, can drive it.
+A desktop micro-factory prototype: four small servo arms around one work plate. Each arm has an automatic tool changer and shares two tool racks and a reamer and bit block with its neighbours. A scheduler keeps all four arms working at once. A flip fixture lets the arms work on the underside of a part. It builds small DIY electronics, such as a perfboard ESP32 smartwatch (soldered, flashed and self-tested in the cell), a micro-drone, a desk robot head with an OLED face and an LED bar soldered underneath. It sits inside a miniature robot cell with a door interlock, light curtain, tower light and control panel, and Claude, or any MCP client, can drive it.
 
 ```
               back: pin cup · finished tray
@@ -19,6 +19,7 @@ A desktop micro-factory prototype: four small servo arms around one work plate. 
 | Path | What it is |
 |---|---|
 | `sim/forge-mini-sim.html` | Interactive 3D simulation of the four-week build and the three projects. Open it in any browser. |
+| `docs/SMARTWATCH.md` | The ESP32-C3 perfboard smartwatch, step by step: what the cell does, what you do, design changes |
 | `docs/CAPABILITIES.md` | What it can make: computed accuracy, small assembly, soldering, underside work, the precision upgrade |
 | `docs/ENCLOSURE.md` | The miniature robot cell: enclosure, door interlock, light curtain, tower light, HMI, wiring |
 | `docs/BUILD_GUIDE.md` | Week-by-week build plan, with what to check in the simulator first |
@@ -28,7 +29,8 @@ A desktop micro-factory prototype: four small servo arms around one work plate. 
 | `controller/` | Python: kinematics, recipe planner, hardware executor, vision, MCP server |
 | `controller/cell.yaml` | The whole cell as data: arms, tools, racks, bits, zones, locations |
 | `controller/recipes/` | Recipes for each week, plus two the planner is expected to reject |
-| `firmware/forge_esp32/` | ESP32 firmware: 24 servo channels, tool signals, tool ID, probe, e-stop, watchdog |
+| `firmware/forge_esp32/` | ESP32 firmware: 24 servo channels, tool signals, tool ID, probe, flip fixture, USB-C dock, enclosure safety |
+| `firmware/watch_example/` | Example smartwatch firmware with the self-test the dock checks |
 
 ## Quick start (no hardware needed)
 
@@ -40,7 +42,7 @@ forge budget                                      # reach, servo load per tool, 
 forge precision                                   # tool-tip accuracy and which jobs it allows
 forge plan recipes/micro_drone.yaml               # validate, schedule, show arm usage
 forge export recipes/micro_drone.yaml -o d.json   # open d.json in the simulator
-pytest                                            # 50 tests
+pytest                                            # 54 tests
 ```
 
 To rebuild the simulator after editing recipes or `cell.yaml`, run `python sim/build.py` from this folder.
@@ -57,7 +59,7 @@ steps:
   - tool_change: {arm: arm4, tool: none}      # returns the bit, then the spindle
 ```
 
-Actions: `tool_change`, `bit_change`, `pick`, `place` (with optional `into` and `press`), `hold`, `release`, `machine`, `drive` (screws), `solder`, `draw`, `probe`, `flip` (turn the part over), `inspect`, `move`, `park`, `calibrate`, `wait`.
+Actions: `tool_change`, `bit_change`, `pick`, `place` (with optional `into` and `press`), `hold`, `release`, `machine`, `drive` (screws), `solder`, `draw`, `probe`, `trace` (drag-soldered track), `flip` (turn the part over), `flash` (USB-C dock), `operator` (a job for a person), `inspect`, `move`, `park`, `calibrate`, `wait`.
 
 You don't need to say what runs in parallel. With the default `schedule: auto`, every step starts as soon as its arm, its parts and tools, the shared zones and a 20 mm clearance between tools allow. That makes the projects 30–50% faster than running one step at a time (see `docs/PROJECTS.md`).
 

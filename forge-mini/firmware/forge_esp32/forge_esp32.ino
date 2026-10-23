@@ -9,6 +9,8 @@
 //   {"cmd":"tool","arm":4,"value":90}      tool-signal channel (servo-style PWM)
 //   {"cmd":"tower","state":"run"}          run | wait | idle | fault (tower light)
 //   {"cmd":"fan","on":true}  {"cmd":"light","on":true}
+//   {"cmd":"aux","name":"flip","deg":180,"ms":1600}   flip fixture trunnion servo
+//   {"cmd":"aux","name":"dock","deg":160,"ms":800}    USB-C programming dock slide
 //   {"cmd":"status"}  {"cmd":"ping"}  {"cmd":"reset"}  {"cmd":"relax"}
 //
 // Replies:  {"ok":true}  /  {"ok":false,"err":"..."}
@@ -53,6 +55,11 @@ const float PROBE_OHMS = 4700.0f;
 
 Adafruit_PWMServoDriver board0(0x40);  // arms 1-2, channels 0-11
 Adafruit_PWMServoDriver board1(0x41);  // arms 3-4, channels 0-11
+
+// Auxiliary servos on spare PCA9685 channels of board0
+struct Aux { const char *name; uint8_t channel; float now, from, to; uint32_t start, ms; bool active; };
+Aux AUX[] = { {"flip", 12, 0, 0, 0, 0, 1, false}, {"dock", 13, 0, 0, 0, 0, 1, false} };
+const int NUM_AUX = 2;
 
 const int NUM_ARMS = 4;
 const int JOINTS = 5;  // base, shoulder, elbow, wrist, latch
@@ -230,6 +237,19 @@ void handleLine(const String &line) {
     for (const char *k : STATES) if (strcmp(st, k) == 0) towerState = k;
     reply(true);
   }
+  else if (strcmp(cmd, "aux") == 0) {
+    if (estopLatched || interlockLatched) return reply(false, "stopped");
+    const char *name = doc["name"] | "";
+    for (int i = 0; i < NUM_AUX; i++) if (strcmp(name, AUX[i].name) == 0) {
+      AUX[i].from = AUX[i].now;
+      AUX[i].to = constrain((float)(doc["deg"] | 0), 0.0f, 180.0f);
+      AUX[i].start = millis();
+      AUX[i].ms = max<uint32_t>(doc["ms"] | 800, TICK_MS);
+      AUX[i].active = true;
+      return reply(true);
+    }
+    reply(false, "unknown aux");
+  }
   else if (strcmp(cmd, "fan") == 0) { digitalWrite(PIN_FAN, (doc["on"] | false) ? HIGH : LOW); reply(true); }
   else if (strcmp(cmd, "light") == 0) { digitalWrite(PIN_LIGHT, (doc["on"] | false) ? HIGH : LOW); reply(true); }
   else if (strcmp(cmd, "reset") == 0) {
@@ -334,6 +354,16 @@ void loop() {
   lastTick = millis();
   watchProbes();
   if (relaxed) return;
+
+  for (int i = 0; i < NUM_AUX; i++) {
+    Aux &x = AUX[i];
+    if (x.active && !estopLatched && !interlockLatched) {
+      float f = (float)(millis() - x.start) / x.ms;
+      if (f >= 1.0f) { f = 1.0f; x.active = false; }
+      x.now = x.from + (x.to - x.from) * f;
+    }
+    board0.setPWM(x.channel, 0, degToTicks(x.now));
+  }
 
   for (int a = 0; a < NUM_ARMS; a++) {
     Motion &m = arms[a];

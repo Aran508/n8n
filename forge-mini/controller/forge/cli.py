@@ -67,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("recipe")
     run.add_argument("--port", required=True, help="e.g. /dev/ttyUSB0")
     run.add_argument("--camera", type=int, default=None, help="camera index for inspections")
+    run.add_argument("--flash-port", default=None, help="USB port the product appears on when docked, e.g. /dev/ttyACM0")
+    run.add_argument("--firmware-dir", default="firmware", help="folder with the product firmware images")
     args = p.parse_args(argv)
 
     cell = load_cell(args.cell) if args.cell else load_cell()
@@ -135,9 +137,14 @@ def main(argv: list[str] | None = None) -> int:
             from .vision import Camera, make_inspector
 
             inspector = make_inspector(Camera(args.camera))
+        flasher = None
+        if args.flash_port:
+            from .programmer import make_flasher
+
+            flasher = make_flasher(args.flash_port, args.firmware_dir)
         link = SerialLink(args.port)
         try:
-            play(cell, timeline, link, inspector)
+            play(cell, timeline, link, inspector, flasher=flasher)
         finally:
             link.send({"cmd": "relax"})
             link.close()

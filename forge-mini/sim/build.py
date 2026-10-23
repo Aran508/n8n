@@ -26,6 +26,7 @@ JOBS = {
     "drone": "micro_drone",
     "bot": "desk_bot_head",
     "led": "led_bar",
+    "watch": "smartwatch",
 }
 
 
