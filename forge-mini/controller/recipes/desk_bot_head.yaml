@@ -1,0 +1,44 @@
+# Project: desk robot head (like the little Arduino robot with an OLED face).
+# The printed head shell lies face-up in the fixture. You load: the shell in
+# the kit tray, the 0.96" OLED module in the side pocket and two M2 screws in
+# cup B. The cell drops the OLED in, glues it, screws the back plate, solders
+# the four OLED wires (VCC, GND, SCL, SDA) and unloads the head.
+product: desk_bot_head
+items:
+  head: {at: kit.part,  kind: bot_head}
+  oled: {at: side.part, kind: oled}
+  s1:   {at: cup_b, kind: screw}
+  s2:   {at: cup_b, kind: screw}
+steps:
+  - tool_change: {arm: arm3, tool: vacuum}
+  - tool_change: {arm: arm1, tool: tweezers}
+  - tool_change: {arm: arm2, tool: glue}
+  - tool_change: {arm: arm4, tool: spindle}
+  - bit_change:  {arm: arm4, bit: hex_1_5}
+  - pick:  {arm: arm3, item: head, from: kit.part}
+    note: Loader brings the head shell
+  - place: {arm: arm3, to: bot.head}
+  - pick:  {arm: arm3, item: oled, from: side.part}
+    note: OLED drops into the face recess
+  - place: {arm: arm3, to: bot.oled, into: head}
+  - draw:  {arm: arm2, at: bot.oled, path: [[-14, -12], [14, -12], [14, 12]]}
+    note: Glue bead along two edges of the OLED
+  - pick:  {arm: arm1, item: s1, from: cup_b}
+    note: Assembler sets the screws with tweezers
+  - place: {arm: arm1, to: bot.screw1, into: head}
+  - pick:  {arm: arm1, item: s2, from: cup_b}
+  - place: {arm: arm1, to: bot.screw2, into: head}
+  - drive: {arm: arm4, at: [bot.screw1, bot.screw2], depth: 2}
+    note: Machinist drives both screws
+  - tool_change: {arm: arm4, tool: iron}
+  - solder: {arm: arm4, at: [bot.pad1, bot.pad2, bot.pad3, bot.pad4]}
+    note: Solder VCC, GND, SCL and SDA
+  - inspect: {at: bot.head, check: oled_seated}
+  - tool_change: {arm: arm1, tool: gripper_A}
+    note: Tweezers out, gripper in for the finished head
+  - pick:  {arm: arm1, item: head, from: bot.head}
+  - place: {arm: arm1, to: finished}
+  - tool_change: {arm: arm1, tool: none}
+  - tool_change: {arm: arm2, tool: none}
+  - tool_change: {arm: arm3, tool: none}
+  - tool_change: {arm: arm4, tool: none}

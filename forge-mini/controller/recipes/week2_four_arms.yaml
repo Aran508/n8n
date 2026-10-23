@@ -1,0 +1,38 @@
+# Week 2: four arms, two racks, one plate. Neighbours share a rack, so the
+# zone manager lets only one arm into a rack at a time and at most two arms
+# over the fixture.
+product: week2_four_arms
+items:
+  block: {at: fixture, kind: block}
+steps:
+  - parallel:
+      - calibrate: {arm: arm1}
+      - calibrate: {arm: arm2}
+      - calibrate: {arm: arm3}
+      - calibrate: {arm: arm4}
+    note: All four arms calibrate together, each in its own corner
+  - parallel:
+      - tool_change: {arm: arm1, tool: gripper_A}
+      - tool_change: {arm: arm2, tool: clamp}
+    note: One arm per rack - arm1 at the left rack, arm2 at the right
+  - parallel:
+      - tool_change: {arm: arm3, tool: probe}
+      - - tool_change: {arm: arm4, tool: spindle}
+        - bit_change: {arm: arm4, bit: drill_1_5}
+    note: Then their neighbours - arm4 also loads a bit from the bit block
+  - probe: {arm: arm3, at: fixture}
+    note: Probe measures the block height
+  - pick:  {arm: arm1, item: block, from: fixture}
+  - place: {arm: arm1, to: cal_b}
+  - pick:  {arm: arm1, item: block, from: cal_b}
+  - place: {arm: arm1, to: fixture}
+  - hold: {arm: arm2, at: fixture.edge}
+    note: Clamp holds the block down
+  - release: {arm: arm2}
+  - parallel:
+      - tool_change: {arm: arm1, tool: none}
+      - tool_change: {arm: arm2, tool: none}
+    note: Return tools, one arm per rack
+  - parallel:
+      - tool_change: {arm: arm3, tool: none}
+      - tool_change: {arm: arm4, tool: none}

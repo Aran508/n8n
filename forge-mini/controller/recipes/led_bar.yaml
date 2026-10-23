@@ -1,0 +1,50 @@
+# Project: LED bar, through-hole, soldered the way you would on a
+# helping-hands station. One arm clamps the PCB while two arms push LEDs
+# through their holes from both sides. Then the flip fixture turns the board
+# over and the iron solders all 8 legs on the underside, where through-hole
+# joints belong. You load: the PCB in the kit tray, two LEDs in cup A (back)
+# and two in the side pocket (front).
+product: led_bar
+items:
+  pcb: {at: kit.part, kind: pcb}
+  l1: {at: cup_a, kind: led}
+  l2: {at: cup_a, kind: led}
+  l3: {at: side.part, kind: led}
+  l4: {at: side.part, kind: led}
+steps:
+  - tool_change: {arm: arm3, tool: vacuum}
+  - tool_change: {arm: arm1, tool: tweezers}
+  - tool_change: {arm: arm2, tool: clamp}
+  - tool_change: {arm: arm4, tool: iron}
+  - pick:  {arm: arm3, item: pcb, from: kit.part}
+    note: Loader brings the PCB to the flip fixture
+  - place: {arm: arm3, to: led.pcb}
+  - hold:  {arm: arm2, at: led.hold}
+    note: Clamp holds the left end of the board - the helping hand
+  - pick:  {arm: arm1, item: l1, from: cup_a}
+    note: LEDs go in from both sides at once
+  - place: {arm: arm1, to: led.l1, into: pcb, press: 1}
+  - pick:  {arm: arm3, item: l3, from: side.part}
+  - place: {arm: arm3, to: led.l3, into: pcb, press: 1}
+  - pick:  {arm: arm1, item: l2, from: cup_a}
+  - place: {arm: arm1, to: led.l2, into: pcb, press: 1}
+  - pick:  {arm: arm3, item: l4, from: side.part}
+  - place: {arm: arm3, to: led.l4, into: pcb, press: 1}
+  - release: {arm: arm2}
+    note: Clamp lets go; the fixture jaws hold the board for the flip
+  - flip: {at: led}
+    note: Flip fixture turns the board over - legs now point up
+  - solder: {arm: arm4, at: [led.bot.j1a, led.bot.j1b, led.bot.j2a, led.bot.j2b]}
+    note: Iron solders the legs on the underside
+  - solder: {arm: arm4, at: [led.bot.j3a, led.bot.j3b, led.bot.j4a, led.bot.j4b]}
+  - flip: {at: led}
+    note: Turn it back, LEDs up
+  - inspect: {at: led.pcb, check: eight_joints_and_leds}
+  - tool_change: {arm: arm1, tool: gripper_A}
+  - pick:  {arm: arm1, item: pcb, from: led.pcb}
+    note: Finished LED bar to the tray
+  - place: {arm: arm1, to: finished}
+  - tool_change: {arm: arm1, tool: none}
+  - tool_change: {arm: arm2, tool: none}
+  - tool_change: {arm: arm3, tool: none}
+  - tool_change: {arm: arm4, tool: none}

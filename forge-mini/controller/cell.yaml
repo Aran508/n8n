@@ -1,0 +1,182 @@
+# Forge Mini cell definition (tool-changer edition).
+# World frame: origin = centre of the work plate top surface, X right, Y away
+# from the operator, Z up. All lengths in millimetres, angles in degrees.
+#
+#                 back: pin cup . finished tray
+#        arm1 Assembler ●───────────● arm2 Holder
+#   left tool rack  |      [ fixture ]      |  right tool rack + bit block
+#        arm3 Loader    ●───────────● arm4 Machinist
+#                 front: kit tray (you load parts here)
+
+links:            # identical for all four arms (see docs/ARM_DESIGN.md)
+  h0: 55          # plate top -> shoulder axis
+  L1: 80          # shoulder -> elbow
+  L2: 80          # elbow -> wrist
+  coupler: 22     # wrist axis -> tool-changer face (the "flange")
+
+arms:
+  arm1: {role: assembler, base: [-70.7,  70.7], yaw: -45,  board: 0x40, first_channel: 0,  id_pin: 32}
+  arm2: {role: holder,    base: [ 70.7,  70.7], yaw: -135, board: 0x40, first_channel: 6,  id_pin: 33}
+  arm3: {role: loader,    base: [-70.7, -70.7], yaw: 45,   board: 0x41, first_channel: 0,  id_pin: 34}
+  arm4: {role: machinist, base: [ 70.7, -70.7], yaw: 135,  board: 0x41, first_channel: 6,  id_pin: 35}
+
+# Channels per arm: base, shoulder, elbow, wrist, lock (coupler latch), tool signal.
+# servo_deg = offset + sign * joint_deg + trim
+servo_map:
+  base:     {offset: 90, sign: 1,  min: -90,  max: 90}
+  shoulder: {offset: 0,  sign: 1,  min: 0,    max: 180}
+  elbow:    {offset: 0,  sign: -1, min: -180, max: 0}
+  wrist:    {offset: 90, sign: 1,  min: -90,  max: 90}
+  lock:     {offset: 0,  sign: 1,  min: 0,    max: 180}
+
+lock: {open: 20, locked: 105}   # coupler cam servo
+
+trims:
+  arm1: [0, 0, 0, 0, 0]
+  arm2: [0, 0, 0, 0, 0]
+  arm3: [0, 0, 0, 0, 0]
+  arm4: [0, 0, 0, 0, 0]
+
+# Tool catalogue. length = coupler face -> tool centre point (TCP).
+# id_ohms is the resistor in the tool that tells the ESP32 which tool is on.
+# signal = what the tool-signal channel means for this tool.
+tools:
+  gripper_A: {type: gripper, rack: rack_L, slot: [-100,  36], length: 38, mass: 22, id_ohms: 1000,
+              signal: {open: 30, closed: 100}}
+  tweezers:  {type: tweezers, rack: rack_L, slot: [-100, 18], length: 44, mass: 16, id_ohms: 1500,
+              signal: {open: 40, closed: 110}}
+  vacuum:    {type: vacuum,  rack: rack_L, slot: [-100,   0], length: 34, mass: 20, id_ohms: 2200,
+              signal: {off: 0, on: 180}}
+  pen:       {type: pen,     rack: rack_L, slot: [-100, -18], length: 46, mass: 8,  id_ohms: 3300}
+  probe:     {type: probe,   rack: rack_L, slot: [-100, -36], length: 44, mass: 10, id_ohms: 4700}
+  gripper_B: {type: gripper, rack: rack_R, slot: [100,  36], length: 38, mass: 22, id_ohms: 1000,
+              signal: {open: 30, closed: 100}}
+  clamp:     {type: clamp,   rack: rack_R, slot: [100,  18], length: 30, mass: 12, id_ohms: 6800}
+  spindle:   {type: spindle, rack: rack_R, slot: [100,   0], length: 36, mass: 28, id_ohms: 10000,
+              signal: {off: 0, slow: 90, fast: 180}}
+  iron:      {type: iron,    rack: rack_R, slot: [100, -18], length: 52, mass: 34, id_ohms: 22000,
+              signal: {off: 0, heat: 60, feed: 150}}
+  glue:      {type: dispenser, rack: rack_R, slot: [100, -36], length: 48, mass: 24, id_ohms: 15000,
+              signal: {stop: 90, push: 140}}
+  iron_B:    {type: iron,    rack: rack_B, slot: [0,    90], length: 52, mass: 34, id_ohms: 22000,
+              signal: {off: 0, heat: 60, feed: 150}}
+
+# Racks are shelves with holes; tools hang through them like a reamer stand.
+racks:
+  rack_L: {z: 40, arms: [arm1, arm3]}
+  rack_R: {z: 40, arms: [arm2, arm4]}
+  rack_B: {z: 40, arms: [arm1, arm2]}   # one-slot stand at the back for the second iron
+
+# Bits for the spindle, standing shank-up in a block (the "reamer set").
+# stickout = collet face -> cutting tip. strip = direction the spindle slides
+# to pull a bit off its magnetic collet under the stripper bar.
+bit_block: {z: 20, strip: [-12, 0], arms: [arm2, arm4]}
+bits:
+  ream_2_0:  {kind: reamer,      dia: 2.0, stickout: 16, slot: [76, -24]}
+  ream_3_0:  {kind: reamer,      dia: 3.0, stickout: 18, slot: [76, -12]}
+  drill_1_5: {kind: drill,       dia: 1.5, stickout: 14, slot: [76,   0]}
+  csink_90:  {kind: countersink, dia: 6.0, stickout: 10, slot: [76,  12]}
+  hex_1_5:   {kind: hex_driver,  dia: 1.5, stickout: 14, slot: [76,  24]}
+
+motion:
+  speed_mm_s: 80        # cartesian travel speed
+  feed_mm_s: 2          # cutting feed for reamers / drills
+  min_move_ms: 250
+  approach_height: 30   # mm above a location before descending
+  travel_plane: 50      # tool tip height for sideways moves over parts (clears tools working there)
+  tool_pitch: -90       # tools point straight down
+
+# Shared areas. At most `capacity` arms may be inside each at once. On top of
+# that, the planner keeps every pair of tools `clearance` mm apart (each tool is
+# a vertical segment from tip to coupler face; 20 mm = two coupler-plate radii),
+# checked every 50 ms of the plan.
+clearance: 20
+zones:
+  centre:   {center: [0, 0],     radius: 45, capacity: 3}
+  rack_L:   {center: [-100, 0],  radius: 40, capacity: 1}
+  rack_R:   {center: [92, 0],    radius: 42, capacity: 1}
+  kit_tray: {center: [0, -108],  radius: 32, capacity: 1}
+  back:     {center: [0, 108],   radius: 50, capacity: 1}
+
+# Flip fixture: the centre fixture is a trunnion that turns the part 180 deg
+# about the X axis (axis_z above the plate), so arms can work on its underside.
+# A point (x, y, z) on the part ends up at (x, -y, 2 * axis_z - z).
+flipper: {sites: [fixture, drone, bot, led, watch], zone: centre, axis_z: 10, seconds: 1.6}
+
+# USB-C programming dock on the fixture: a servo slide pushes a USB-C plug into
+# the product's port, the Pi flashes firmware and runs the product's self-test.
+programmer: {zone: centre, seconds: 20, servo: dock}
+
+# Named places: (x, y, z) of the surface the TCP touches.
+locations:
+  # fixture and the doweled bracket
+  fixture:        [0, 0, 5]
+  fixture.edge:   [0, 13, 5]
+  fixture.hole1:  [-18, 0, 5]
+  fixture.hole2:  [18, 0, 5]
+  fixture.pin1:   [-18, 0, 11]
+  fixture.pin2:   [18, 0, 11]
+  fixture.pin1_top: [-18, 0, 9]
+  fixture.pin2_top: [18, 0, 9]
+  # micro-drone: 46 mm motor spacing (a "65 mm" whoop), sits in the fixture pocket
+  drone.frame:    [0, 0, 4]
+  drone.m1:       [-23, 23, 9]
+  drone.m2:       [23, 23, 9]
+  drone.m3:       [23, -23, 9]
+  drone.m4:       [-23, -23, 9]
+  drone.p1:       [-23, 23, 15]
+  drone.p2:       [23, 23, 15]
+  drone.p3:       [23, -23, 15]
+  drone.p4:       [-23, -23, 15]
+  drone.fc:       [0, 0, 7]
+  drone.screw1:   [-8, -8, 7]
+  drone.screw2:   [8, 8, 7]
+  drone.pad1:     [-9, 6, 7]
+  drone.pad2:     [9, -6, 7]
+  drone.pad3:     [6, 9, 7]
+  drone.pad4:     [-6, -9, 7]
+  # desk robot head: 36 mm shell lying face-up, 0.96" OLED drops into the face
+  bot.head:       [0, 0, 16]
+  bot.oled:       [0, -3, 18]
+  bot.screw1:     [-13, 13, 16]
+  bot.screw2:     [13, 13, 16]
+  bot.pad1:       [-6, 14, 16]
+  bot.pad2:       [-2, 14, 16]
+  bot.pad3:       [2, 14, 16]
+  bot.pad4:       [6, 14, 16]
+  # LED bar: 64 x 16 mm PCB, through-hole LEDs; the clamp holds the left end like a helping hand
+  led.pcb:        [-8, 0, 2]
+  led.hold:       [-38, -2, 2]
+  led.l1:         [-10, -3, 7]
+  led.l2:         [0, -3, 7]
+  led.l3:         [10, -3, 7]
+  led.l4:         [20, -3, 7]
+  # underside after a flip: legs at y = -3 come up at y = +3, PCB bottom (z 0.4) at z 19.6
+  led.bot.j1a:     [-11.27, 3, 20]
+  led.bot.j1b:     [-8.73, 3, 20]
+  led.bot.j2a:     [-1.27, 3, 20]
+  led.bot.j2b:     [1.27, 3, 20]
+  led.bot.j3a:     [8.73, 3, 20]
+  led.bot.j3b:     [11.27, 3, 20]
+  led.bot.j4a:     [18.73, 3, 20]
+  led.bot.j4b:     [21.27, 3, 20]
+  # supply points: kit tray (front), side pocket (front-left), parts cups (back)
+  kit.plate:      [0, -108, 2]
+  kit.part:       [0, -108, 4]
+  side.part:      [-34, -98, 4]
+  pin_cup:        [-28, 104, 10]
+  cup_a:          [-28, 104, 10]
+  cup_b:          [-8, 112, 8]
+  cup_c:          [22, -98, 10]
+  finished:       [32, 108, 2]
+  # week 1 pads
+  cal_a:          [-45, 30, 0]
+  cal_b:          [-20, 75, 0]
+  cal_square:     [-15, 40, 0]
+
+# Park poses are for the coupler face, so the arm's pose is the same whatever tool it holds.
+park:
+  arm1: [-40, 40, 60]
+  arm2: [40, 40, 60]
+  arm3: [-40, -40, 60]
+  arm4: [40, -40, 60]
