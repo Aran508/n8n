@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hydraulic Gesture Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: full-bleed 3D workshop bench, instrument panels pinned to the four corners. */
+  :root {
+    --bg: #040b12;
+    --panel: rgba(6, 22, 34, 0.72);
+    --line: rgba(79, 216, 255, 0.28);
+    --fg: #d9f6ff;
+    --muted: #6fa3b8;
+    --accent: #4fd8ff;   /* hologram cyan */
+    --warn: #f0a23a;     /* polyurethane-seal orange, for pressure loss */
+    --ok: #57c78a;
+    --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 14px/1.45 var(--font-mono);
+    overflow: hidden;
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #scene:active { cursor: grabbing; }
+
+  .panel {
+    position: fixed; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; padding: 12px 14px; backdrop-filter: blur(6px);
+  }
+  .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
+  .title { top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); max-width: min(460px, calc(100% - 32px)); }
+  .title h1 { font: 700 34px/1 var(--font-display); letter-spacing: .02em; margin: 4px 0 6px; text-transform: uppercase; text-wrap: balance; }
+  .title p { margin: 0; color: var(--muted); font-size: 12px; }
+
+  .gauges { top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); display: grid; grid-template-columns: auto auto; gap: 4px 18px; font-variant-numeric: tabular-nums; }
+  .gauges .val { font: 700 30px/1 var(--font-display); }
+  .gauges .val small { font: 500 13px var(--font-mono); color: var(--muted); margin-left: 4px; }
+  #pressure.drop { color: var(--warn); }
+  .panel { box-shadow: 0 0 24px rgba(79,216,255,.08), inset 0 0 18px rgba(79,216,255,.05); }
+  #scan { position: fixed; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(79,216,255,.035) 0 1px, transparent 1px 3px); mix-blend-mode: screen; }
+  #reticles { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  .cam { left: max(16px, env(safe-area-inset-left)); bottom: max(16px, env(safe-area-inset-bottom)); width: 264px; padding: 10px; }
+  .cam .view { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #050607; border-radius: 4px; overflow: hidden; }
+  .cam video, .cam canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  .cam video { opacity: .55; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .chip.live i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  #camStatus { color: var(--muted); font-size: 11px; margin-top: 6px; min-height: 1.4em; }
+
+  .legend { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); width: 300px; }
+  .legend ul { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 6px; }
+  .legend li { display: grid; grid-template-columns: 34px 1fr; align-items: center; font-size: 12px; }
+  .legend li b { font: 700 15px var(--font-display); letter-spacing: .04em; text-transform: uppercase; display: block; color: var(--fg); }
+  .legend li span { color: var(--muted); }
+  .legend li.on b { color: var(--accent); }
+  .glyph { font-size: 20px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+  button {
+    font: 500 12px var(--font-mono); color: var(--fg); background: #1c242b; border: 1px solid var(--line);
+    padding: 7px 12px; border-radius: 4px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); color: #021018; border-color: var(--accent); font-weight: 600; }
+
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+  .lbl {
+    position: absolute; left: 0; top: 0; white-space: nowrap; font-size: 11px; color: var(--fg);
+    padding: 2px 6px; border-left: 2px solid var(--accent); background: rgba(13,16,19,.72);
+    transition: opacity .25s;
+  }
+
+  #start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8,10,12,.78); z-index: 5; padding: 16px; }
+  #start .card { max-width: 440px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 22px; }
+  #start h2 { font: 700 28px/1.05 var(--font-display); text-transform: uppercase; margin: 6px 0 10px; }
+  #start p { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+
+  #flash { position: fixed; inset: 0; background: radial-gradient(circle, rgba(255,190,110,.55), transparent 60%); opacity: 0; pointer-events: none; }
+
+  @media (max-width: 760px) {
+    .title h1 { font-size: 26px; }
+    .gauges { top: auto; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 230px); }
+    .cam { width: 170px; }
+    .legend { width: auto; left: calc(max(16px, env(safe-area-inset-left)) + 186px); }
+    .legend ul { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .lbl { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="3D hydraulic cylinder"></canvas>
+<div id="scan"></div>
+<canvas id="reticles"></canvas>
+<div id="labels"></div>
+<div id="flash"></div>
+
+<section class="panel title">
+  <div class="eyebrow">Tie-rod double-acting cylinder</div>
+  <h1>Hydraulic Gesture Lab</h1>
+  <p>Ø63 bore · Ø36 chrome rod · 250 mm stroke · ISO 6020-2</p>
+</section>
+
+<section class="panel gauges" aria-live="polite">
+  <div class="eyebrow">System pressure</div><div class="eyebrow">Exploded</div>
+  <div class="val" id="pressure">210<small>bar</small></div>
+  <div class="val" id="explodePct">0<small>%</small></div>
+</section>
+
+<section class="panel cam">
+  <div class="view">
+    <video id="video" playsinline muted></video>
+    <canvas id="handCanvas" width="640" height="480"></canvas>
+  </div>
+  <div class="chip" id="chip"><i></i><span id="gestureName">Camera off</span></div>
+  <div id="camStatus"></div>
+</section>
+
+<section class="panel legend">
+  <div class="eyebrow">Gestures</div>
+  <ul>
+    <li data-g="two"><span class="glyph">🙌</span><div><b>Two hands</b><span>Pull apart to explode, push together to assemble</span></div></li>
+    <li data-g="open"><span class="glyph">✋</span><div><b>Open palm</b><span>Move your hand to rotate the cylinder</span></div></li>
+    <li data-g="fist"><span class="glyph">✊</span><div><b>Fist</b><span>Hold to clamp it back together</span></div></li>
+    <li data-g="pinch"><span class="glyph">🤏</span><div><b>Pinch</b><span>Pinch and move up or down to zoom</span></div></li>
+  </ul>
+  <div class="row">
+    <label class="eyebrow" for="explodeSlider">Explode</label>
+    <input id="explodeSlider" type="range" min="0" max="1" step="0.001" value="0">
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button id="toggleBtn" type="button">Blow it apart (E)</button>
+    <button id="camBtn" type="button">Start camera</button>
+    <button id="modeBtn" type="button">Metal view (H)</button>
+  </div>
+</section>
+
+<div id="start">
+  <div class="card">
+    <div class="eyebrow">Workshop online</div>
+    <h2>Take this cylinder apart with your hands</h2>
+    <p>Allow the camera and stand back so both hands are in frame. Hand tracking runs in your browser; no video leaves this machine. No camera? Drag to rotate, scroll to zoom and use the slider.</p>
+    <div class="row">
+      <button class="primary" id="startCam" type="button">Start camera</button>
+      <button id="startMouse" type="button">Use mouse only</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+const THREE = window.THREE;
+const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ---------- renderer / scene ----------
+const canvas = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x040b12);
+scene.fog = new THREE.Fog(0x040b12, 22, 45);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+
+// Simple studio environment so the chrome and steel have something to reflect.
+{
+  const env = new THREE.Scene();
+  const room = new THREE.Mesh(new THREE.BoxGeometry(30, 30, 30), new THREE.MeshBasicMaterial({ color: 0x1b1f24, side: THREE.BackSide }));
+  env.add(room);
+  const panel = (w, h, x, y, z, c) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+    m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
+  };
+  panel(18, 4, 0, 13, 0, 0xffffff);
+  panel(6, 10, 13, 2, 6, 0xd8e4ff);
+  panel(6, 10, -13, 2, -6, 0xffd9b0);
+  panel(20, 2, 0, -2, 14, 0x707880);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(env, 0.04).texture;
+}
+
+scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x1a1410, 0.35));
+const key = new THREE.DirectionalLight(0xffffff, 1.6);
+key.position.set(5, 9, 6); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12 });
+scene.add(key);
+const blastLight = new THREE.PointLight(0xffa040, 0, 18);
+scene.add(blastLight);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({ opacity: 0.38 }));
+floor.rotation.x = -Math.PI / 2; floor.position.y = -3.7; floor.receiveShadow = true;
+scene.add(floor);
+const grid = new THREE.GridHelper(40, 40, 0x0f4a63, 0x0a2533);
+grid.position.y = -3.69; scene.add(grid);
+
+// ---------- materials ----------
+const M = {
+  paint:  new THREE.MeshStandardMaterial({ color: 0x24476b, metalness: 0.35, roughness: 0.42, side: THREE.DoubleSide }),
+  steel:  new THREE.MeshStandardMaterial({ color: 0x9aa3ab, metalness: 1, roughness: 0.32 }),
+  dark:   new THREE.MeshStandardMaterial({ color: 0x5b636b, metalness: 0.9, roughness: 0.5 }),
+  chrome: new THREE.MeshStandardMaterial({ color: 0xeef3f6, metalness: 1, roughness: 0.06 }),
+  bronze: new THREE.MeshStandardMaterial({ color: 0xb48c55, metalness: 1, roughness: 0.3, side: THREE.DoubleSide }),
+  pu:     new THREE.MeshStandardMaterial({ color: 0xf08a24, metalness: 0, roughness: 0.55 }),
+  nbr:    new THREE.MeshStandardMaterial({ color: 0x17181a, metalness: 0, roughness: 0.75 }),
+};
+
+// ---------- geometry helpers (long axis = X) ----------
+const V2 = THREE.Vector2, V3 = THREE.Vector3;
+const alongX = g => { g.rotateZ(-Math.PI / 2); return g; };
+const cyl = (r, len, seg = 48) => alongX(new THREE.CylinderGeometry(r, r, len, seg));
+const hex = (r, len) => alongX(new THREE.CylinderGeometry(r, r, len, 6));
+const tube = (ri, ro, len, seg = 72) => alongX(new THREE.LatheGeometry(
+  [new V2(ri, -len / 2), new V2(ro, -len / 2), new V2(ro, len / 2), new V2(ri, len / 2), new V2(ri, -len / 2)], seg));
+const ring = (R, t) => { const g = new THREE.TorusGeometry(R, t, 16, 72); g.rotateY(Math.PI / 2); return g; };
+const mesh = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; return m; };
+
+// pivot tilts (pitch) toward the camera, model spins (yaw) about vertical
+const pivot = new THREE.Group(); scene.add(pivot);
+const model = new THREE.Group(); pivot.add(model);
+
+const parts = [];
+function addPart(obj, base, exploded, label, delay, spin = 0) {
+  obj.position.set(...base);
+  model.add(obj);
+  parts.push({ obj, base: new V3(...base), exploded: new V3(...exploded), label, delay, spin });
+}
+
+function endCap(withPort) {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.BoxGeometry(0.5, 1.72, 1.72), M.steel));
+  const port = mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.24, 24), M.dark);
+  port.position.y = 0.96; g.add(port);
+  const plug = mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.08, 6), M.pu);
+  plug.position.y = 1.12; g.add(plug);
+  if (withPort) { const boss = mesh(cyl(0.36, 0.04), M.dark); boss.position.x = 0.27; g.add(boss); }
+  return g;
+}
+function rearClevis() {
+  const g = new THREE.Group();
+  const plate = mesh(new THREE.BoxGeometry(0.22, 0.95, 0.95), M.dark); plate.position.x = -0.11; g.add(plate);
+  for (const z of [-0.3, 0.3]) {
+    const ear = mesh(new THREE.BoxGeometry(0.75, 0.75, 0.15), M.dark); ear.position.set(-0.55, 0, z); g.add(ear);
+  }
+  const pin = mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.95, 24), M.chrome);
+  pin.rotation.x = Math.PI / 2; pin.position.x = -0.7; g.add(pin);
+  return g;
+}
+function rodEye() {
+  const g = new THREE.Group();
+  const neck = mesh(cyl(0.2, 0.35), M.dark); neck.position.x = 0.17; g.add(neck);
+  const eye = mesh(new THREE.TorusGeometry(0.28, 0.12, 20, 48), M.dark); eye.position.x = 0.62; g.add(eye);
+  const ball = mesh(new THREE.SphereGeometry(0.2, 32, 16), M.chrome); ball.position.x = 0.62; g.add(ball);
+  return g;
+}
+
+// Assembled positions sit inside the 4.0-long barrel; exploded layout uses three tiers:
+// main axis (caps, glands, seals), lower tier (rod + piston), outer ring (tie rods + nuts).
+const T = -2.4; // lower tier height
+addPart(mesh(tube(0.56, 0.66, 4.0), M.paint),  [0, 0, 0],      [-0.6, 0, 0],   "Barrel · honed tube Ø63", 0.30);
+addPart(endCap(false),                          [-2.25, 0, 0],  [-4.3, 0, 0],   "Cap end cover · port A", 0.18);
+addPart(rearClevis(),                           [-2.5, 0, 0],   [-5.2, 0, 0],   "Rear clevis + pivot pin", 0.22);
+addPart(mesh(ring(0.6, 0.04), M.nbr),          [-2.0, 0, 0],   [-3.4, 0, 0],   "Static O-rings ×2", 0.26);
+addPart(endCap(true),                           [2.25, 0, 0],   [3.2, 0, 0],    "Head end cover · port B", 0.18);
+addPart(mesh(ring(0.6, 0.04), M.nbr),          [2.0, 0, 0],    [2.3, 0, 0],    null, 0.26);
+addPart(mesh(tube(0.18, 0.34, 0.55), M.bronze), [2.6, 0, 0],    [4.4, 0, 0],    "Gland bushing · bronze", 0.24);
+addPart(mesh(ring(0.2, 0.045), M.pu),          [2.55, 0, 0],   [5.1, 0, 0],    "Rod seal · U-cup PU", 0.32);
+addPart(mesh(ring(0.23, 0.055), M.nbr),        [2.88, 0, 0],   [5.7, 0, 0],    "Rod wiper", 0.34);
+addPart(mesh(cyl(0.18, 4.6), M.chrome),        [1.3, 0, 0],    [1.5, T, 0],    "Piston rod · hard chrome Ø36", 0.36);
+addPart(mesh(cyl(0.54, 0.5), M.steel),         [-1.25, 0, 0],  [-1.9, T, 0],   "Piston", 0.4);
+addPart(mesh(ring(0.53, 0.05), M.pu),          [-1.38, 0, 0],  [-2.6, T, 0],   "Piston seals ×2", 0.44);
+addPart(mesh(ring(0.53, 0.05), M.pu),          [-1.12, 0, 0],  [-1.2, T, 0],   null, 0.44);
+addPart(mesh(hex(0.3, 0.22), M.dark),          [-1.61, 0, 0],  [-3.3, T, 0],   "Piston lock nut", 0.42, 4);
+addPart(rodEye(),                               [3.6, 0, 0],    [4.6, T, 0],    "Rod eye + spherical bearing", 0.38);
+
+const C = 0.72; // tie-rod corner offset
+[[C, C], [C, -C], [-C, C], [-C, -C]].forEach(([y, z], i) => {
+  const s = 2.6;
+  addPart(mesh(cyl(0.07, 5.2, 16), M.steel), [0, y, z], [-0.6, y * s, z * s], i ? null : "Tie rods ×4", 0.06);
+  addPart(mesh(hex(0.14, 0.16), M.dark), [-2.62, y, z], [-5.6, y * s, z * s], i ? null : "Tie-rod nuts ×8", 0, 5);
+  addPart(mesh(hex(0.14, 0.16), M.dark), [2.62, y, z], [4.4, y * s, z * s], null, 0, -5);
+});
+
+// ---------- part labels ----------
+const labelsEl = document.getElementById("labels");
+for (const p of parts) {
+  if (!p.label) continue;
+  p.el = document.createElement("div");
+  p.el.className = "lbl"; p.el.textContent = p.label; p.el.style.opacity = 0;
+  labelsEl.appendChild(p.el);
+}
+
+// ---------- hologram mode ----------
+const holoFill = new THREE.MeshBasicMaterial({ color: 0x1ca8e0, transparent: true, opacity: 0.14,
+  blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+const holoEdge = new THREE.LineBasicMaterial({ color: 0x8ee9ff, transparent: true, opacity: 0.9,
+  blending: THREE.AdditiveBlending, depthWrite: false });
+const holoMeshes = [];
+model.traverse(o => {
+  if (!o.isMesh) return;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 28), holoEdge);
+  o.add(edges);
+  holoMeshes.push({ mesh: o, metal: o.material, edges });
+});
+
+// projector base: concentric rings that turn slowly under the model
+const projector = new THREE.Group();
+projector.position.y = -3.6; scene.add(projector);
+for (const [r, o] of [[3.2, 0.5], [4.6, 0.35], [6.2, 0.22], [7.6, 0.14]]) {
+  const g = new THREE.RingGeometry(r, r + 0.04, 128); g.rotateX(-Math.PI / 2);
+  projector.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x4fd8ff, transparent: true, opacity: o,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })));
+}
+const tickMat = new THREE.MeshBasicMaterial({ color: 0x8ee9ff, transparent: true, opacity: 0.6,
+  blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+for (let i = 0; i < 24; i++) {
+  const g = new THREE.PlaneGeometry(0.5, 0.06); g.rotateX(-Math.PI / 2); g.translate(5.4, 0, 0);
+  const tick = new THREE.Mesh(g, tickMat); tick.rotation.y = (i / 24) * Math.PI * 2; projector.add(tick);
+}
+const beam = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 3.2, 3.6, 64, 1, true),
+  new THREE.MeshBasicMaterial({ color: 0x1ca8e0, transparent: true, opacity: 0.035,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+beam.position.y = 1.8; projector.add(beam);
+
+let holo = true;
+function setHolo(on) {
+  holo = on;
+  for (const h of holoMeshes) { h.mesh.material = on ? holoFill : h.metal; h.edges.visible = on; h.mesh.castShadow = !on; }
+  projector.visible = on; floor.visible = !on; grid.visible = !on;
+  document.getElementById("modeBtn").textContent = on ? "Metal view (H)" : "Hologram view (H)";
+}
+setHolo(true);
+document.getElementById("modeBtn").addEventListener("click", () => setHolo(!holo));
+addEventListener("keydown", e => { if (e.key === "h" || e.key === "H") setHolo(!holo); });
+
+// ---------- sparks ----------
+const SPARKS = 500;
+const sGeo = new THREE.BufferGeometry();
+const sPos = new Float32Array(SPARKS * 3).fill(999), sCol = new Float32Array(SPARKS * 3);
+const sVel = new Float32Array(SPARKS * 3), sLife = new Float32Array(SPARKS);
+sGeo.setAttribute("position", new THREE.BufferAttribute(sPos, 3));
+sGeo.setAttribute("color", new THREE.BufferAttribute(sCol, 3));
+const sparks = new THREE.Points(sGeo, new THREE.PointsMaterial({
+  size: 0.09, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+model.add(sparks);
+
+function blast() {
+  for (let i = 0; i < SPARKS; i++) {
+    const a = Math.random() * Math.PI * 2, x = (Math.random() - 0.5) * 4.6;
+    sPos.set([x, Math.cos(a) * 0.7, Math.sin(a) * 0.7], i * 3);
+    const sp = 2 + Math.random() * 7;
+    sVel.set([(Math.random() - 0.5) * 6, Math.cos(a) * sp + 2, Math.sin(a) * sp], i * 3);
+    sLife[i] = 0.6 + Math.random() * 0.8;
+  }
+  blastLight.intensity = 6;
+  shake = reduceMotion ? 0 : 0.35;
+  const f = document.getElementById("flash");
+  f.animate([{ opacity: 0.9 }, { opacity: 0 }], { duration: 450, easing: "ease-out" });
+}
+function updateSparks(dt) {
+  for (let i = 0; i < SPARKS; i++) {
+    if (sLife[i] <= 0) continue;
+    sLife[i] -= dt;
+    const k = i * 3;
+    sVel[k + 1] -= 9.8 * dt;
+    sPos[k] += sVel[k] * dt; sPos[k + 1] += sVel[k + 1] * dt; sPos[k + 2] += sVel[k + 2] * dt;
+    if (sPos[k + 1] < -3.65) { sPos[k + 1] = -3.65; sVel[k + 1] *= -0.35; }
+    const l = Math.max(0, sLife[i]);
+    sCol.set([1 * l, 0.62 * l, 0.22 * l], k);
+    if (sLife[i] <= 0) sPos[k] = 999;
+  }
+  sGeo.attributes.position.needsUpdate = true;
+  sGeo.attributes.color.needsUpdate = true;
+}
+
+// ---------- interaction state ----------
+const state = { targetE: 0, e: 0, yaw: -0.55, pitch: 0.38, tYaw: -0.55, tPitch: 0.38, zoom: 1, tZoom: 1 };
+let shake = 0, armed = true;
+
+const slider = document.getElementById("explodeSlider");
+slider.addEventListener("input", () => { state.targetE = +slider.value; });
+document.getElementById("toggleBtn").addEventListener("click", () => { state.targetE = state.targetE > 0.5 ? 0 : 1; });
+addEventListener("keydown", e => { if (e.key === "e" || e.key === "E") state.targetE = state.targetE > 0.5 ? 0 : 1; });
+
+let drag = null;
+canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener("pointermove", e => {
+  if (!drag) return;
+  state.tYaw += (e.clientX - drag.x) * 0.008;
+  state.tPitch = clamp(state.tPitch + (e.clientY - drag.y) * 0.006, -0.6, 1.2);
+  drag = { x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener("pointerup", () => { drag = null; });
+canvas.addEventListener("wheel", e => { e.preventDefault(); state.tZoom = clamp(state.tZoom * (1 + e.deltaY * 0.001), 0.5, 1.8); }, { passive: false });
+
+// ---------- hand tracking ----------
+const video = document.getElementById("video");
+const hctx = document.getElementById("handCanvas").getContext("2d");
+const camStatus = document.getElementById("camStatus");
+const chip = document.getElementById("chip");
+const gestureName = document.getElementById("gestureName");
+let landmarker = null, lastVideoTime = -1, gesture = { cand: "none", n: 0, stable: "none" }, pinchY = null;
+
+const rCanvas = document.getElementById("reticles"), rctx = rCanvas.getContext("2d");
+function drawReticles(hands, now) {
+  rCanvas.width = innerWidth; rCanvas.height = innerHeight;
+  rctx.strokeStyle = "rgba(79,216,255,.9)"; rctx.fillStyle = "rgba(79,216,255,.9)"; rctx.lineWidth = 1.5;
+  rctx.font = "11px 'IBM Plex Mono', monospace";
+  for (const lm of hands) {
+    for (const tip of [4, 8]) {
+      const x = (1 - lm[tip].x) * innerWidth, y = lm[tip].y * innerHeight, a = now / 400;
+      rctx.beginPath(); rctx.arc(x, y, 16, a, a + 4.2); rctx.stroke();
+      rctx.beginPath(); rctx.arc(x, y, 3, 0, 7); rctx.fill();
+    }
+    const px = (1 - lm[9].x) * innerWidth, py = lm[9].y * innerHeight;
+    rctx.fillText(`X ${lm[9].x.toFixed(2)}  Y ${lm[9].y.toFixed(2)}`, px + 22, py);
+  }
+  if (hands.length >= 2) {
+    const a = hands[0][9], b = hands[1][9];
+    rctx.setLineDash([6, 6]); rctx.beginPath();
+    rctx.moveTo((1 - a.x) * innerWidth, a.y * innerHeight); rctx.lineTo((1 - b.x) * innerWidth, b.y * innerHeight);
+    rctx.stroke(); rctx.setLineDash([]);
+  }
+}
+
+const HAND_LINKS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+async function startCamera() {
+  document.getElementById("start").hidden = true;
+  if (landmarker) return;
+  const btn = document.getElementById("camBtn");
+  btn.disabled = true;
+  try {
+    camStatus.textContent = "Requesting camera…";
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" }, audio: false });
+    video.srcObject = stream; await video.play();
+    camStatus.textContent = "Loading hand tracker…";
+    const { FilesetResolver, HandLandmarker } = await import(MP_URL);
+    const fileset = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
+    const opts = d => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate: d }, runningMode: "VIDEO", numHands: 2,
+      minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+    try { landmarker = await HandLandmarker.createFromOptions(fileset, opts("GPU")); }
+    catch { landmarker = await HandLandmarker.createFromOptions(fileset, opts("CPU")); }
+    camStatus.textContent = "Tracking. Show your hands.";
+    chip.classList.add("live");
+    btn.textContent = "Camera on";
+  } catch (err) {
+    console.error(err);
+    btn.disabled = false;
+    camStatus.textContent = err && err.name === "NotAllowedError"
+      ? "Camera blocked. Allow it in the address bar, then press Start camera."
+      : "Couldn't start tracking (" + (err.message || err) + "). Open this page from localhost or https.";
+  }
+}
+document.getElementById("startCam").addEventListener("click", startCamera);
+document.getElementById("camBtn").addEventListener("click", startCamera);
+document.getElementById("startMouse").addEventListener("click", () => { document.getElementById("start").hidden = true; });
+
+function classify(lm) {
+  const size = dist(lm[0], lm[9]);
+  const extended = [[8, 6], [12, 10], [16, 14], [20, 18]]
+    .filter(([tip, pip]) => dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]) * 1.12).length;
+  if (dist(lm[4], lm[8]) < size * 0.3) return "pinch";
+  if (extended === 0) return "fist";
+  if (extended >= 4) return "open";
+  return "other";
+}
+
+const GESTURE_TEXT = { none: "No hands", two: "Two hands · exploding", open: "Open palm · rotating",
+  fist: "Fist · assembling", pinch: "Pinch · zooming", other: "Hand detected" };
+function setGesture(g) {
+  gestureName.textContent = GESTURE_TEXT[g];
+  document.querySelectorAll(".legend li").forEach(li => li.classList.toggle("on", li.dataset.g === g));
+}
+
+function trackHands(dt) {
+  if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+  const res = landmarker.detectForVideo(video, performance.now());
+  const hands = res.landmarks || [];
+
+  // draw skeletons
+  const W = hctx.canvas.width, H = hctx.canvas.height;
+  hctx.clearRect(0, 0, W, H);
+  hctx.lineWidth = 3; hctx.strokeStyle = "#4fd8ff"; hctx.fillStyle = "#ffffff";
+  for (const lm of hands) {
+    hctx.beginPath();
+    for (const [a, b] of HAND_LINKS) { hctx.moveTo(lm[a].x * W, lm[a].y * H); hctx.lineTo(lm[b].x * W, lm[b].y * H); }
+    hctx.stroke();
+    for (const p of lm) { hctx.beginPath(); hctx.arc(p.x * W, p.y * H, 3.5, 0, 7); hctx.fill(); }
+  }
+
+  drawReticles(hands, performance.now());
+
+  // debounce gesture over a few frames
+  const raw = hands.length >= 2 ? "two" : hands.length === 1 ? classify(hands[0]) : "none";
+  if (raw === gesture.cand) gesture.n++; else { gesture.cand = raw; gesture.n = 0; }
+  if (gesture.n >= 2 && gesture.stable !== raw) { gesture.stable = raw; setGesture(raw); }
+  const g = gesture.stable;
+
+  if (g === "two" && hands.length >= 2) {
+    const d = dist(hands[0][9], hands[1][9]);
+    state.targetE = clamp((d - 0.2) / 0.42, 0, 1);
+  } else if (hands.length === 1) {
+    const lm = hands[0], palm = lm[9];
+    if (g === "open") {
+      state.tYaw = ((1 - palm.x) - 0.5) * 3.4 - 0.55;
+      state.tPitch = clamp((palm.y - 0.5) * 1.8 + 0.38, -0.6, 1.2);
+    } else if (g === "fist") {
+      state.targetE = Math.max(0, state.targetE - dt * 1.3);
+    }
+    if (g === "pinch") {
+      const y = (lm[4].y + lm[8].y) / 2;
+      if (pinchY !== null) state.tZoom = clamp(state.tZoom * (1 + (y - pinchY) * 2.2), 0.5, 1.8);
+      pinchY = y;
+    } else pinchY = null;
+  } else pinchY = null;
+}
+
+// ---------- main loop ----------
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const pressureEl = document.getElementById("pressure"), pctEl = document.getElementById("explodePct");
+const tmp = new V3();
+let last = performance.now(), prevE = 0;
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize); resize();
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  trackHands(dt);
+
+  const k = Math.min(1, dt * 6);
+  state.e += (state.targetE - state.e) * k;
+  state.yaw += (state.tYaw - state.yaw) * k;
+  state.pitch += (state.tPitch - state.pitch) * k;
+  state.zoom += (state.tZoom - state.zoom) * k;
+  if (document.activeElement !== slider) slider.value = state.targetE;
+
+  // a fast pull-apart from (nearly) assembled triggers the blast
+  const vel = (state.e - prevE) / Math.max(dt, 1e-3); prevE = state.e;
+  if (armed && state.e > 0.04 && vel > 0.9) { blast(); armed = false; }
+  if (state.e < 0.02) armed = true;
+
+  for (const p of parts) {
+    const t = ease(clamp((state.e - p.delay * 0.6) / (1 - p.delay * 0.6), 0, 1));
+    p.obj.position.lerpVectors(p.base, p.exploded, t);
+    if (p.spin) p.obj.rotation.x = t * p.spin * Math.PI;
+    p.t = t;
+  }
+
+  pivot.rotation.x = state.pitch;
+  model.rotation.y = state.yaw;
+  const dist0 = (12 + 7 * ease(state.e)) * state.zoom;
+  shake *= 0.9;
+  camera.position.set((Math.random() - 0.5) * shake, 2.2 + 1.2 * state.e + (Math.random() - 0.5) * shake, dist0);
+  camera.lookAt(0, -0.6 - 0.4 * state.e, 0);
+  blastLight.intensity *= 0.9;
+  projector.rotation.y += dt * 0.15;
+
+  updateSparks(dt);
+  renderer.render(scene, camera);
+
+  // labels
+  const showLabels = state.e > 0.55;
+  for (const p of parts) {
+    if (!p.el) continue;
+    p.obj.getWorldPosition(tmp); tmp.project(camera);
+    const x = (tmp.x * 0.5 + 0.5) * innerWidth, y = (-tmp.y * 0.5 + 0.5) * innerHeight;
+    p.el.style.transform = `translate(${x + 10}px, ${y - 26}px)`;
+    p.el.style.opacity = showLabels && tmp.z < 1 ? Math.min(1, (state.e - 0.55) * 4) : 0;
+  }
+
+  const pressure = Math.round(210 * (1 - clamp(state.e / 0.12, 0, 1)));
+  pressureEl.firstChild.nodeValue = pressure;
+  pressureEl.classList.toggle("drop", pressure < 210);
+  pctEl.firstChild.nodeValue = Math.round(state.e * 100);
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
