@@ -17,6 +17,7 @@
     --accent: #4fd8ff;   /* hologram cyan */
     --warn: #f0a23a;     /* polyurethane-seal orange, for pressure loss */
     --ok: #57c78a;
+    --hot: #ffb050;      /* selected part */
     --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
     --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
     color-scheme: dark;
@@ -88,6 +89,14 @@
   #start h2 { font: 700 28px/1.05 var(--font-display); text-transform: uppercase; margin: 6px 0 10px; }
   #start p { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
 
+  .info { top: calc(max(16px, env(safe-area-inset-top)) + 112px); left: max(16px, env(safe-area-inset-left)); width: 300px; border-color: rgba(255,176,80,.5); }
+  .info h2 { font: 700 24px/1.05 var(--font-display); text-transform: uppercase; margin: 4px 0 6px; color: var(--hot); text-wrap: balance; }
+  .info p { margin: 0 0 8px; font-size: 12px; color: var(--fg); }
+  .info dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 12px; }
+  .info dt { color: var(--muted); }
+  .info dd { margin: 0; }
+  .info .hint { margin-top: 10px; font-size: 11px; color: var(--muted); }
+  .lbl.sel { border-left-color: var(--hot); color: var(--hot); font-weight: 500; }
   #flash { position: fixed; inset: 0; background: radial-gradient(circle, rgba(255,190,110,.55), transparent 60%); opacity: 0; pointer-events: none; }
 
   @media (max-width: 760px) {
@@ -96,6 +105,7 @@
     .cam { width: 170px; }
     .legend { width: auto; left: calc(max(16px, env(safe-area-inset-left)) + 186px); }
     .legend ul { display: none; }
+    .info { top: auto; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 300px); width: calc(100% - 32px); }
   }
   @media (prefers-reduced-motion: reduce) { .lbl { transition: none; } }
 </style>
@@ -131,10 +141,11 @@
 <section class="panel legend">
   <div class="eyebrow">Gestures</div>
   <ul>
-    <li data-g="two"><span class="glyph">🙌</span><div><b>Two hands</b><span>Pull apart to explode, push together to assemble</span></div></li>
-    <li data-g="open"><span class="glyph">✋</span><div><b>Open palm</b><span>Move your hand to rotate the cylinder</span></div></li>
-    <li data-g="fist"><span class="glyph">✊</span><div><b>Fist</b><span>Hold to clamp it back together</span></div></li>
-    <li data-g="pinch"><span class="glyph">🤏</span><div><b>Pinch</b><span>Pinch and move up or down to zoom</span></div></li>
+    <li data-g="point"><span class="glyph">☝️</span><div><b>Point</b><span>Aim the cursor at a part to highlight it</span></div></li>
+    <li data-g="pinch"><span class="glyph">🤏</span><div><b>Pinch</b><span>Select the part you aim at; keep pinching and move to pull it out. Pinch empty space to deselect</span></div></li>
+    <li data-g="open"><span class="glyph">✋</span><div><b>Open palm</b><span>Move to turn the model; move closer to zoom in</span></div></li>
+    <li data-g="victory"><span class="glyph">✌️</span><div><b>Peace sign</b><span>Hold to explode</span></div></li>
+    <li data-g="fist"><span class="glyph">✊</span><div><b>Fist</b><span>Hold to reassemble everything</span></div></li>
   </ul>
   <div class="row">
     <label class="eyebrow" for="explodeSlider">Explode</label>
@@ -147,11 +158,19 @@
   </div>
 </section>
 
+<section class="panel info" id="info" hidden aria-live="polite">
+  <div class="eyebrow" id="infoCount">Selected part</div>
+  <h2 id="infoName"></h2>
+  <p id="infoRole"></p>
+  <dl><dt>Material</dt><dd id="infoMat"></dd><dt>Spec</dt><dd id="infoSpec"></dd></dl>
+  <div class="hint">Pinch and move to pull it out. ✊ Fist puts everything back.</div>
+</section>
+
 <div id="start">
   <div class="card">
     <div class="eyebrow">Workshop online</div>
     <h2>Take this cylinder apart with your hands</h2>
-    <p>Allow the camera and stand back so both hands are in frame. Hand tracking runs in your browser; no video leaves this machine. No camera? Drag to rotate, scroll to zoom and use the slider.</p>
+    <p>Allow the camera and raise one hand about half a metre from it. Everything works with a single hand. Hand tracking runs in your browser; no video leaves this machine. No camera? Click a part to select it, drag a part to pull it out, drag empty space to rotate, scroll to zoom.</p>
     <div class="row">
       <button class="primary" id="startCam" type="button">Start camera</button>
       <button id="startMouse" type="button">Use mouse only</button>
@@ -239,11 +258,29 @@ const pivot = new THREE.Group(); scene.add(pivot);
 const model = new THREE.Group(); pivot.add(model);
 
 const parts = [];
-function addPart(obj, base, exploded, label, delay, spin = 0) {
+function addPart(obj, base, exploded, name, delay, spin = 0, showLabel = true) {
   obj.position.set(...base);
   model.add(obj);
-  parts.push({ obj, base: new V3(...base), exploded: new V3(...exploded), label, delay, spin });
+  parts.push({ obj, base: new V3(...base), exploded: new V3(...exploded), name, delay, spin, showLabel, offset: new V3(), meshes: [] });
 }
+
+const INFO = {
+  "Barrel":            ["Honed tube that holds the oil and guides the piston.", "ST52 cold-drawn steel, painted", "Ø63 bore × 6.5 mm wall, Ra 0.4 µm"],
+  "Cap end cover":     ["Closes the rear of the barrel and feeds oil to extend the rod.", "C45 steel", "Port A G3/8, clamped by tie rods"],
+  "Rear clevis":       ["Mounts the cylinder so it can pivot as it moves.", "Forged steel + hardened pin", "Ø20 pivot pin"],
+  "Static O-rings":    ["Seal the barrel ends against the covers.", "NBR 70 rubber", "2 pcs, 58 × 3 mm"],
+  "Head end cover":    ["Front cover that holds the gland and feeds oil to retract.", "C45 steel", "Port B G3/8"],
+  "Gland bushing":     ["Guides the rod and takes side loads.", "Leaded bronze", "Ø36 bore, 55 mm long"],
+  "Rod seal":          ["Main seal that stops oil leaking past the rod.", "Polyurethane U-cup", "Rated 400 bar, 0.5 m/s"],
+  "Rod wiper":         ["Scrapes dirt off the rod as it retracts.", "NBR lip wiper", "Ø36 rod"],
+  "Piston rod":        ["Transfers the force out of the cylinder.", "42CrMo4, induction hardened", "Ø36, 25 µm hard chrome"],
+  "Piston":            ["Splits the barrel into the cap-side and rod-side chambers.", "C45 steel", "Ø63, 50 mm wide"],
+  "Piston seals":      ["Stop oil passing between the two chambers.", "Polyurethane", "2 pcs, one per pressure direction"],
+  "Piston lock nut":   ["Holds the piston on the rod.", "Steel nylock nut", "M24, 300 N·m"],
+  "Rod eye":           ["Connects the rod to the load and allows misalignment.", "Forged steel + spherical bearing", "Ø20 bearing"],
+  "Tie rods":          ["Clamp both covers onto the barrel.", "High-tensile steel 10.9", "4 × M12"],
+  "Tie-rod nuts":      ["Tension the tie rods.", "Steel, grade 10", "8 × M12, 75 N·m"],
+};
 
 function endCap(withPort) {
   const g = new THREE.Group();
@@ -276,36 +313,36 @@ function rodEye() {
 // Assembled positions sit inside the 4.0-long barrel; exploded layout uses three tiers:
 // main axis (caps, glands, seals), lower tier (rod + piston), outer ring (tie rods + nuts).
 const T = -2.4; // lower tier height
-addPart(mesh(tube(0.56, 0.66, 4.0), M.paint),  [0, 0, 0],      [-0.6, 0, 0],   "Barrel · honed tube Ø63", 0.30);
-addPart(endCap(false),                          [-2.25, 0, 0],  [-4.3, 0, 0],   "Cap end cover · port A", 0.18);
-addPart(rearClevis(),                           [-2.5, 0, 0],   [-5.2, 0, 0],   "Rear clevis + pivot pin", 0.22);
-addPart(mesh(ring(0.6, 0.04), M.nbr),          [-2.0, 0, 0],   [-3.4, 0, 0],   "Static O-rings ×2", 0.26);
-addPart(endCap(true),                           [2.25, 0, 0],   [3.2, 0, 0],    "Head end cover · port B", 0.18);
-addPart(mesh(ring(0.6, 0.04), M.nbr),          [2.0, 0, 0],    [2.3, 0, 0],    null, 0.26);
-addPart(mesh(tube(0.18, 0.34, 0.55), M.bronze), [2.6, 0, 0],    [4.4, 0, 0],    "Gland bushing · bronze", 0.24);
-addPart(mesh(ring(0.2, 0.045), M.pu),          [2.55, 0, 0],   [5.1, 0, 0],    "Rod seal · U-cup PU", 0.32);
+addPart(mesh(tube(0.56, 0.66, 4.0), M.paint),  [0, 0, 0],      [-0.6, 0, 0],   "Barrel", 0.30);
+addPart(endCap(false),                          [-2.25, 0, 0],  [-4.3, 0, 0],   "Cap end cover", 0.18);
+addPart(rearClevis(),                           [-2.5, 0, 0],   [-5.2, 0, 0],   "Rear clevis", 0.22);
+addPart(mesh(ring(0.6, 0.04), M.nbr),          [-2.0, 0, 0],   [-3.4, 0, 0],   "Static O-rings", 0.26);
+addPart(endCap(true),                           [2.25, 0, 0],   [3.2, 0, 0],    "Head end cover", 0.18);
+addPart(mesh(ring(0.6, 0.04), M.nbr),          [2.0, 0, 0],    [2.3, 0, 0],    "Static O-rings", 0.26, 0, false);
+addPart(mesh(tube(0.18, 0.34, 0.55), M.bronze), [2.6, 0, 0],    [4.4, 0, 0],    "Gland bushing", 0.24);
+addPart(mesh(ring(0.2, 0.045), M.pu),          [2.55, 0, 0],   [5.1, 0, 0],    "Rod seal", 0.32);
 addPart(mesh(ring(0.23, 0.055), M.nbr),        [2.88, 0, 0],   [5.7, 0, 0],    "Rod wiper", 0.34);
-addPart(mesh(cyl(0.18, 4.6), M.chrome),        [1.3, 0, 0],    [1.5, T, 0],    "Piston rod · hard chrome Ø36", 0.36);
+addPart(mesh(cyl(0.18, 4.6), M.chrome),        [1.3, 0, 0],    [1.5, T, 0],    "Piston rod", 0.36);
 addPart(mesh(cyl(0.54, 0.5), M.steel),         [-1.25, 0, 0],  [-1.9, T, 0],   "Piston", 0.4);
-addPart(mesh(ring(0.53, 0.05), M.pu),          [-1.38, 0, 0],  [-2.6, T, 0],   "Piston seals ×2", 0.44);
-addPart(mesh(ring(0.53, 0.05), M.pu),          [-1.12, 0, 0],  [-1.2, T, 0],   null, 0.44);
+addPart(mesh(ring(0.53, 0.05), M.pu),          [-1.38, 0, 0],  [-2.6, T, 0],   "Piston seals", 0.44);
+addPart(mesh(ring(0.53, 0.05), M.pu),          [-1.12, 0, 0],  [-1.2, T, 0],   "Piston seals", 0.44, 0, false);
 addPart(mesh(hex(0.3, 0.22), M.dark),          [-1.61, 0, 0],  [-3.3, T, 0],   "Piston lock nut", 0.42, 4);
-addPart(rodEye(),                               [3.6, 0, 0],    [4.6, T, 0],    "Rod eye + spherical bearing", 0.38);
+addPart(rodEye(),                               [3.6, 0, 0],    [4.6, T, 0],    "Rod eye", 0.38);
 
 const C = 0.72; // tie-rod corner offset
 [[C, C], [C, -C], [-C, C], [-C, -C]].forEach(([y, z], i) => {
   const s = 2.6;
-  addPart(mesh(cyl(0.07, 5.2, 16), M.steel), [0, y, z], [-0.6, y * s, z * s], i ? null : "Tie rods ×4", 0.06);
-  addPart(mesh(hex(0.14, 0.16), M.dark), [-2.62, y, z], [-5.6, y * s, z * s], i ? null : "Tie-rod nuts ×8", 0, 5);
-  addPart(mesh(hex(0.14, 0.16), M.dark), [2.62, y, z], [4.4, y * s, z * s], null, 0, -5);
+  addPart(mesh(cyl(0.07, 5.2, 16), M.steel), [0, y, z], [-0.6, y * s, z * s], "Tie rods", 0.06, 0, !i);
+  addPart(mesh(hex(0.14, 0.16), M.dark), [-2.62, y, z], [-5.6, y * s, z * s], "Tie-rod nuts", 0, 5, !i);
+  addPart(mesh(hex(0.14, 0.16), M.dark), [2.62, y, z], [4.4, y * s, z * s], "Tie-rod nuts", 0, -5, false);
 });
 
 // ---------- part labels ----------
 const labelsEl = document.getElementById("labels");
 for (const p of parts) {
-  if (!p.label) continue;
+  if (!p.showLabel) continue;
   p.el = document.createElement("div");
-  p.el.className = "lbl"; p.el.textContent = p.label; p.el.style.opacity = 0;
+  p.el.className = "lbl"; p.el.textContent = p.name; p.el.style.opacity = 0;
   labelsEl.appendChild(p.el);
 }
 
@@ -314,13 +351,85 @@ const holoFill = new THREE.MeshBasicMaterial({ color: 0x1ca8e0, transparent: tru
   blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 const holoEdge = new THREE.LineBasicMaterial({ color: 0x8ee9ff, transparent: true, opacity: 0.9,
   blending: THREE.AdditiveBlending, depthWrite: false });
-const holoMeshes = [];
-model.traverse(o => {
-  if (!o.isMesh) return;
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 28), holoEdge);
-  o.add(edges);
-  holoMeshes.push({ mesh: o, metal: o.material, edges });
-});
+const holoHotFill = new THREE.MeshBasicMaterial({ color: 0xff9a30, transparent: true, opacity: 0.32,
+  blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+const holoHotEdge = new THREE.LineBasicMaterial({ color: 0xffd28a, transparent: true, opacity: 1,
+  blending: THREE.AdditiveBlending, depthWrite: false });
+const holoDimFill = holoFill.clone(); holoDimFill.opacity = 0.05;
+const holoDimEdge = holoEdge.clone(); holoDimEdge.opacity = 0.22;
+const metalHot = new THREE.MeshStandardMaterial({ color: 0xffb060, emissive: 0x7a2e00, metalness: 0.6, roughness: 0.35 });
+const pickables = [];
+for (const p of parts) {
+  p.obj.traverse(o => {
+    if (!o.isMesh) return;
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 28), holoEdge);
+    o.add(edges);
+    o.userData.part = p;
+    p.meshes.push({ mesh: o, metal: o.material, edges });
+    pickables.push(o);
+  });
+}
+
+// hovered / selected are tracked by part name, so "Tie rods" highlights all four
+let hoverName = null, selName = null, grabbed = null;
+function applyLook() {
+  for (const p of parts) {
+    const st = p.name === selName || p.name === hoverName ? "hot" : selName ? "dim" : "base";
+    const key = st + holo;
+    if (p.look === key) continue;
+    p.look = key;
+    for (const h of p.meshes) {
+      if (holo) {
+        h.mesh.material = st === "hot" ? holoHotFill : st === "dim" ? holoDimFill : holoFill;
+        h.edges.material = st === "hot" ? holoHotEdge : st === "dim" ? holoDimEdge : holoEdge;
+      } else {
+        h.mesh.material = st === "hot" ? metalHot : h.metal;
+      }
+      h.edges.visible = holo;
+      h.mesh.castShadow = !holo;
+    }
+  }
+}
+
+const infoEl = document.getElementById("info");
+function select(name) {
+  selName = name;
+  infoEl.hidden = !name;
+  if (!name) return;
+  const [role, mat, spec] = INFO[name];
+  const count = parts.filter(p => p.name === name).length;
+  document.getElementById("infoCount").textContent = count > 1 ? `Selected part · ${count} pcs` : "Selected part";
+  document.getElementById("infoName").textContent = name;
+  document.getElementById("infoRole").textContent = role;
+  document.getElementById("infoMat").textContent = mat;
+  document.getElementById("infoSpec").textContent = spec;
+}
+
+const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), proj = new V3();
+function pickAt(x, y) {
+  ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.intersectObjects(pickables, false)[0];
+  if (hit) return hit.object.userData.part;
+  // thin parts are hard to hit with a shaky finger: fall back to the nearest part centre on screen
+  let best = null, bestD = 42;
+  for (const p of parts) {
+    p.obj.getWorldPosition(proj).project(camera);
+    const d = Math.hypot((proj.x * 0.5 + 0.5) * innerWidth - x, (-proj.y * 0.5 + 0.5) * innerHeight - y);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  return best;
+}
+
+const camRight = new V3(), camUp = new V3(), dragQ = new THREE.Quaternion(), dragPos = new V3();
+function dragPart(p, dx, dy) {
+  const d = camera.position.distanceTo(p.obj.getWorldPosition(dragPos));
+  const wpp = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / innerHeight;
+  camRight.setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(dx * wpp);
+  camUp.setFromMatrixColumn(camera.matrixWorld, 1).multiplyScalar(-dy * wpp);
+  model.getWorldQuaternion(dragQ).invert();
+  p.offset.add(camRight.add(camUp).applyQuaternion(dragQ));
+}
 
 // projector base: concentric rings that turn slowly under the model
 const projector = new THREE.Group();
@@ -344,7 +453,7 @@ beam.position.y = 1.8; projector.add(beam);
 let holo = true;
 function setHolo(on) {
   holo = on;
-  for (const h of holoMeshes) { h.mesh.material = on ? holoFill : h.metal; h.edges.visible = on; h.mesh.castShadow = !on; }
+  applyLook();
   projector.visible = on; floor.visible = !on; grid.visible = !on;
   document.getElementById("modeBtn").textContent = on ? "Metal view (H)" : "Hologram view (H)";
 }
@@ -401,15 +510,33 @@ slider.addEventListener("input", () => { state.targetE = +slider.value; });
 document.getElementById("toggleBtn").addEventListener("click", () => { state.targetE = state.targetE > 0.5 ? 0 : 1; });
 addEventListener("keydown", e => { if (e.key === "e" || e.key === "E") state.targetE = state.targetE > 0.5 ? 0 : 1; });
 
-let drag = null;
-canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
-canvas.addEventListener("pointermove", e => {
-  if (!drag) return;
-  state.tYaw += (e.clientX - drag.x) * 0.008;
-  state.tPitch = clamp(state.tPitch + (e.clientY - drag.y) * 0.006, -0.6, 1.2);
-  drag = { x: e.clientX, y: e.clientY };
+// mouse: drag a part to pull it out, drag empty space to rotate, click to select
+let drag = null, mouse = null;
+canvas.addEventListener("pointerdown", e => {
+  const part = pickAt(e.clientX, e.clientY);
+  drag = { x: e.clientX, y: e.clientY, part, moved: 0 };
+  canvas.setPointerCapture(e.pointerId);
 });
-canvas.addEventListener("pointerup", () => { drag = null; });
+canvas.addEventListener("pointermove", e => {
+  mouse = { x: e.clientX, y: e.clientY };
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.moved += Math.abs(dx) + Math.abs(dy);
+  if (drag.part) {
+    if (drag.moved > 4) { if (selName !== drag.part.name) select(drag.part.name); dragPart(drag.part, dx, dy); }
+  } else {
+    state.tYaw += dx * 0.008;
+    state.tPitch = clamp(state.tPitch + dy * 0.006, -0.6, 1.2);
+  }
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+canvas.addEventListener("pointerup", () => {
+  if (drag && drag.moved <= 4) select(drag.part ? drag.part.name : null);
+  drag = null;
+});
+canvas.addEventListener("pointerleave", () => { mouse = null; });
+function reset() { state.targetE = 0; select(null); for (const p of parts) p.offset.set(0, 0, 0); }
+addEventListener("keydown", e => { if (e.key === "Escape") select(null); if (e.key === "r" || e.key === "R") reset(); });
 canvas.addEventListener("wheel", e => { e.preventDefault(); state.tZoom = clamp(state.tZoom * (1 + e.deltaY * 0.001), 0.5, 1.8); }, { passive: false });
 
 // ---------- hand tracking ----------
@@ -418,28 +545,33 @@ const hctx = document.getElementById("handCanvas").getContext("2d");
 const camStatus = document.getElementById("camStatus");
 const chip = document.getElementById("chip");
 const gestureName = document.getElementById("gestureName");
-let landmarker = null, lastVideoTime = -1, gesture = { cand: "none", n: 0, stable: "none" }, pinchY = null;
+let landmarker = null, lastVideoTime = -1, gesture = { cand: "none", n: 0, stable: "none" };
+let cursor = null, lastCursor = null, openRef = null, handSeen = false;
 
 const rCanvas = document.getElementById("reticles"), rctx = rCanvas.getContext("2d");
-function drawReticles(hands, now) {
+function drawReticles(lm, g, now) {
   rCanvas.width = innerWidth; rCanvas.height = innerHeight;
-  rctx.strokeStyle = "rgba(79,216,255,.9)"; rctx.fillStyle = "rgba(79,216,255,.9)"; rctx.lineWidth = 1.5;
-  rctx.font = "11px 'IBM Plex Mono', monospace";
-  for (const lm of hands) {
-    for (const tip of [4, 8]) {
-      const x = (1 - lm[tip].x) * innerWidth, y = lm[tip].y * innerHeight, a = now / 400;
-      rctx.beginPath(); rctx.arc(x, y, 16, a, a + 4.2); rctx.stroke();
-      rctx.beginPath(); rctx.arc(x, y, 3, 0, 7); rctx.fill();
-    }
-    const px = (1 - lm[9].x) * innerWidth, py = lm[9].y * innerHeight;
-    rctx.fillText(`X ${lm[9].x.toFixed(2)}  Y ${lm[9].y.toFixed(2)}`, px + 22, py);
+  if (!lm) return;
+  rctx.lineWidth = 1.5; rctx.font = "11px 'IBM Plex Mono', monospace";
+  const cyan = "rgba(79,216,255,.9)", hot = "rgba(255,176,80,1)";
+  // fingertip ticks
+  rctx.fillStyle = cyan;
+  for (const tip of [4, 8, 12, 16, 20]) {
+    const x = (1 - lm[tip].x) * innerWidth, y = lm[tip].y * innerHeight;
+    rctx.beginPath(); rctx.arc(x, y, 2.5, 0, 7); rctx.fill();
   }
-  if (hands.length >= 2) {
-    const a = hands[0][9], b = hands[1][9];
-    rctx.setLineDash([6, 6]); rctx.beginPath();
-    rctx.moveTo((1 - a.x) * innerWidth, a.y * innerHeight); rctx.lineTo((1 - b.x) * innerWidth, b.y * innerHeight);
-    rctx.stroke(); rctx.setLineDash([]);
+  if (!cursor || !(g === "point" || g === "pinch")) return;
+  const pinching = g === "pinch", a = now / 300, c = pinching || hoverName ? hot : cyan;
+  rctx.strokeStyle = c; rctx.fillStyle = c;
+  rctx.beginPath(); rctx.arc(cursor.x, cursor.y, pinching ? 12 : 22, a, a + 4.4); rctx.stroke();
+  rctx.beginPath(); rctx.arc(cursor.x, cursor.y, pinching ? 7 : 4, 0, 7); rctx.fill();
+  for (const k of [0, 1, 2, 3]) {
+    const ang = k * Math.PI / 2, r1 = pinching ? 16 : 27, r2 = r1 + 8;
+    rctx.beginPath(); rctx.moveTo(cursor.x + Math.cos(ang) * r1, cursor.y + Math.sin(ang) * r1);
+    rctx.lineTo(cursor.x + Math.cos(ang) * r2, cursor.y + Math.sin(ang) * r2); rctx.stroke();
   }
+  const label = grabbed ? "Pulling " + grabbed.name : hoverName;
+  if (label) rctx.fillText(label.toUpperCase(), cursor.x + 30, cursor.y - 14);
 }
 
 const HAND_LINKS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
@@ -459,11 +591,11 @@ async function startCamera() {
     camStatus.textContent = "Loading hand tracker…";
     const { FilesetResolver, HandLandmarker } = await import(MP_URL);
     const fileset = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
-    const opts = d => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate: d }, runningMode: "VIDEO", numHands: 2,
+    const opts = d => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate: d }, runningMode: "VIDEO", numHands: 1,
       minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
     try { landmarker = await HandLandmarker.createFromOptions(fileset, opts("GPU")); }
     catch { landmarker = await HandLandmarker.createFromOptions(fileset, opts("CPU")); }
-    camStatus.textContent = "Tracking. Show your hands.";
+    camStatus.textContent = "Tracking. Raise one hand.";
     chip.classList.add("live");
     btn.textContent = "Camera on";
   } catch (err) {
@@ -480,63 +612,96 @@ document.getElementById("startMouse").addEventListener("click", () => { document
 
 function classify(lm) {
   const size = dist(lm[0], lm[9]);
-  const extended = [[8, 6], [12, 10], [16, 14], [20, 18]]
-    .filter(([tip, pip]) => dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]) * 1.12).length;
-  if (dist(lm[4], lm[8]) < size * 0.3) return "pinch";
-  if (extended === 0) return "fist";
-  if (extended >= 4) return "open";
+  const ext = [[8, 6], [12, 10], [16, 14], [20, 18]]
+    .map(([tip, pip]) => dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]) * 1.12);
+  // a pinch keeps the index finger reaching out; in a fist the thumb can touch a curled index
+  if (dist(lm[4], lm[8]) < size * 0.32 && dist(lm[8], lm[0]) > size * 1.1) return "pinch";
+  const n = ext.filter(Boolean).length;
+  if (n === 0) return "fist";
+  if (n >= 4) return "open";
+  if (ext[0] && ext[1] && !ext[2] && !ext[3]) return "victory";
+  if (ext[0] && !ext[1] && !ext[2] && !ext[3]) return "point";
   return "other";
 }
 
-const GESTURE_TEXT = { none: "No hands", two: "Two hands · exploding", open: "Open palm · rotating",
-  fist: "Fist · assembling", pinch: "Pinch · zooming", other: "Hand detected" };
+const GESTURE_TEXT = { none: "No hand", open: "Open palm · turning", point: "Point · aiming",
+  pinch: "Pinch · grabbing", victory: "Peace · exploding", fist: "Fist · reassembling", other: "Hand detected" };
 function setGesture(g) {
   gestureName.textContent = GESTURE_TEXT[g];
   document.querySelectorAll(".legend li").forEach(li => li.classList.toggle("on", li.dataset.g === g));
 }
 
 function trackHands(dt) {
-  if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
-  lastVideoTime = video.currentTime;
-  const res = landmarker.detectForVideo(video, performance.now());
-  const hands = res.landmarks || [];
+  if (!landmarker || video.readyState < 2) return;
+  if (video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+    const res = landmarker.detectForVideo(video, performance.now());
+    handSeen = (res.landmarks || [])[0] || null;
 
-  // draw skeletons
-  const W = hctx.canvas.width, H = hctx.canvas.height;
-  hctx.clearRect(0, 0, W, H);
-  hctx.lineWidth = 3; hctx.strokeStyle = "#4fd8ff"; hctx.fillStyle = "#ffffff";
-  for (const lm of hands) {
-    hctx.beginPath();
-    for (const [a, b] of HAND_LINKS) { hctx.moveTo(lm[a].x * W, lm[a].y * H); hctx.lineTo(lm[b].x * W, lm[b].y * H); }
-    hctx.stroke();
-    for (const p of lm) { hctx.beginPath(); hctx.arc(p.x * W, p.y * H, 3.5, 0, 7); hctx.fill(); }
-  }
-
-  drawReticles(hands, performance.now());
-
-  // debounce gesture over a few frames
-  const raw = hands.length >= 2 ? "two" : hands.length === 1 ? classify(hands[0]) : "none";
-  if (raw === gesture.cand) gesture.n++; else { gesture.cand = raw; gesture.n = 0; }
-  if (gesture.n >= 2 && gesture.stable !== raw) { gesture.stable = raw; setGesture(raw); }
-  const g = gesture.stable;
-
-  if (g === "two" && hands.length >= 2) {
-    const d = dist(hands[0][9], hands[1][9]);
-    state.targetE = clamp((d - 0.2) / 0.42, 0, 1);
-  } else if (hands.length === 1) {
-    const lm = hands[0], palm = lm[9];
-    if (g === "open") {
-      state.tYaw = ((1 - palm.x) - 0.5) * 3.4 - 0.55;
-      state.tPitch = clamp((palm.y - 0.5) * 1.8 + 0.38, -0.6, 1.2);
-    } else if (g === "fist") {
-      state.targetE = Math.max(0, state.targetE - dt * 1.3);
+    const W = hctx.canvas.width, H = hctx.canvas.height;
+    hctx.clearRect(0, 0, W, H);
+    hctx.lineWidth = 3; hctx.strokeStyle = "#4fd8ff"; hctx.fillStyle = "#ffffff";
+    if (handSeen) {
+      const lm = handSeen;
+      hctx.beginPath();
+      for (const [a, b] of HAND_LINKS) { hctx.moveTo(lm[a].x * W, lm[a].y * H); hctx.lineTo(lm[b].x * W, lm[b].y * H); }
+      hctx.stroke();
+      for (const p of lm) { hctx.beginPath(); hctx.arc(p.x * W, p.y * H, 3.5, 0, 7); hctx.fill(); }
     }
-    if (g === "pinch") {
-      const y = (lm[4].y + lm[8].y) / 2;
-      if (pinchY !== null) state.tZoom = clamp(state.tZoom * (1 + (y - pinchY) * 2.2), 0.5, 1.8);
-      pinchY = y;
-    } else pinchY = null;
-  } else pinchY = null;
+
+    // debounce over a few frames so a gesture change doesn't flicker
+    const raw = handSeen ? classify(handSeen) : "none";
+    if (raw === gesture.cand) gesture.n++; else { gesture.cand = raw; gesture.n = 0; }
+    if (gesture.n >= 2 && gesture.stable !== raw) onGestureChange(gesture.stable, raw);
+  }
+  const lm = handSeen, g = gesture.stable;
+
+  // cursor follows the index knuckle, which stays put when you switch between point and pinch
+  if (lm) {
+    const tx = clamp(((1 - lm[5].x) - 0.15) / 0.7, 0, 1) * innerWidth;
+    const ty = clamp((lm[5].y - 0.12) / 0.6, 0, 1) * innerHeight;
+    if (!cursor) cursor = { x: tx, y: ty };
+    cursor.x += (tx - cursor.x) * Math.min(1, dt * 14);
+    cursor.y += (ty - cursor.y) * Math.min(1, dt * 14);
+  } else cursor = null;
+
+  if (g === "point" && cursor) {
+    const p = pickAt(cursor.x, cursor.y);
+    hoverName = p ? p.name : null;
+    hoverPart = p;
+  } else if (g !== "pinch") { hoverName = null; hoverPart = null; }
+
+  if (g === "pinch" && grabbed && cursor && lastCursor) dragPart(grabbed, cursor.x - lastCursor.x, cursor.y - lastCursor.y);
+  lastCursor = cursor && { ...cursor };
+
+  if (g === "open" && lm) {
+    const palm = lm[9], size = dist(lm[0], lm[9]);
+    if (!openRef) openRef = { x: palm.x, y: palm.y, size, yaw: state.tYaw, pitch: state.tPitch, zoom: state.tZoom };
+    state.tYaw = openRef.yaw + (openRef.x - palm.x) * 6;
+    state.tPitch = clamp(openRef.pitch + (palm.y - openRef.y) * 3, -0.6, 1.2);
+    state.tZoom = clamp(openRef.zoom * openRef.size / size, 0.5, 1.8);
+  } else openRef = null;
+
+  if (g === "victory") state.targetE = Math.min(1, state.targetE + dt * 1.4);
+  if (g === "fist") {
+    state.targetE = Math.max(0, state.targetE - dt * 1.4);
+    for (const p of parts) p.offset.multiplyScalar(Math.max(0, 1 - dt * 3));
+    if (selName) select(null);
+  }
+  drawReticles(lm, g, performance.now());
+}
+
+let hoverPart = null;
+function onGestureChange(from, to) {
+  gesture.stable = to;
+  setGesture(to);
+  if (to === "pinch") {
+    // pinch picks whatever the cursor was aiming at; pinching empty space clears the selection
+    const p = hoverPart || (cursor && pickAt(cursor.x, cursor.y));
+    grabbed = p || null;
+    select(p ? p.name : null);
+  }
+  if (from === "pinch") grabbed = null;
 }
 
 // ---------- main loop ----------
@@ -569,7 +734,7 @@ function frame(now) {
 
   for (const p of parts) {
     const t = ease(clamp((state.e - p.delay * 0.6) / (1 - p.delay * 0.6), 0, 1));
-    p.obj.position.lerpVectors(p.base, p.exploded, t);
+    p.obj.position.lerpVectors(p.base, p.exploded, t).add(p.offset);
     if (p.spin) p.obj.rotation.x = t * p.spin * Math.PI;
     p.t = t;
   }
@@ -583,6 +748,12 @@ function frame(now) {
   blastLight.intensity *= 0.9;
   projector.rotation.y += dt * 0.15;
 
+  if (!landmarker) {
+    if (mouse && !drag) { const p = pickAt(mouse.x, mouse.y); hoverName = p ? p.name : null; canvas.style.cursor = p ? "pointer" : ""; }
+    else if (!mouse) hoverName = null;
+  }
+  applyLook();
+  holoHotFill.opacity = 0.26 + 0.12 * Math.sin(now / 180);
   updateSparks(dt);
   renderer.render(scene, camera);
 
@@ -593,7 +764,9 @@ function frame(now) {
     p.obj.getWorldPosition(tmp); tmp.project(camera);
     const x = (tmp.x * 0.5 + 0.5) * innerWidth, y = (-tmp.y * 0.5 + 0.5) * innerHeight;
     p.el.style.transform = `translate(${x + 10}px, ${y - 26}px)`;
-    p.el.style.opacity = showLabels && tmp.z < 1 ? Math.min(1, (state.e - 0.55) * 4) : 0;
+    const isSel = p.name === selName;
+    p.el.classList.toggle("sel", isSel);
+    p.el.style.opacity = tmp.z >= 1 ? 0 : isSel ? 1 : selName ? 0 : showLabels ? Math.min(1, (state.e - 0.55) * 4) : 0;
   }
 
   const pressure = Math.round(210 * (1 - clamp(state.e / 0.12, 0, 1)));

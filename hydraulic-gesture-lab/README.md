@@ -15,14 +15,16 @@ python3 -m http.server 8000
 
 Hand tracking (MediaPipe Hand Landmarker) runs fully in the browser; no video is uploaded.
 
-## Gestures
+## Gestures (one hand)
 
 | Gesture | Action |
 | --- | --- |
-| 🙌 Two hands | Pull apart to explode the cylinder, push together to reassemble. A fast pull sets off a spark blast. |
-| ✋ Open palm | Move your hand to rotate the model |
-| ✊ Fist | Hold to clamp the parts back together |
-| 🤏 Pinch | Pinch and move up/down to zoom |
+| ☝️ Point | Aim the cursor at a part to highlight it |
+| 🤏 Pinch | Select the part you're aiming at; keep pinching and move to pull it out. Pinch empty space to deselect |
+| ✋ Open palm | Move to turn the model; move your hand closer to the camera to zoom in |
+| ✌️ Peace sign | Hold to explode the cylinder (a fast explode sets off a spark blast) |
+| ✊ Fist | Hold to reassemble everything |
 
-No camera? Drag to rotate, scroll to zoom, use the slider, press `E` to explode,
-and `H` to switch between hologram and realistic metal view.
+No camera? Click a part to select it, drag a part to pull it out, drag empty space
+to rotate, scroll to zoom. `E` explodes, `R` resets, `Esc` deselects, `H` switches
+between hologram and realistic metal view.
