@@ -1,0 +1,23 @@
+# Week 1: one arm and its rack. Calibrate the joints, prove the tool changer
+# locks and releases, move a block, then draw a 40 mm square with the pen:
+# measuring that square is the easiest way to find calibration errors.
+product: week1_single_arm
+arms: [arm1]
+items:
+  block: {at: cal_a, kind: block}
+steps:
+  - calibrate: {arm: arm1, sweep: 20}
+    note: Calibration sweep, each joint +/-20 deg
+  - tool_change: {arm: arm1, tool: gripper_A}
+    note: First tool change - pick up the gripper from the left rack
+  - pick:  {arm: arm1, item: block, from: cal_a}
+  - place: {arm: arm1, to: cal_b}
+  - tool_change: {arm: arm1, tool: pen}
+    note: Swap gripper for pen (gripper goes back to its slot first)
+  - draw:
+      arm: arm1
+      at: cal_square
+      path: [[-20, -20], [20, -20], [20, 20], [-20, 20], [-20, -20]]
+    note: Draw a 40 mm square - measure it with calipers
+  - tool_change: {arm: arm1, tool: none}
+    note: Return the pen, park bare

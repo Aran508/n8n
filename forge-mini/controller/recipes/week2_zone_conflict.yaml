@@ -1,0 +1,9 @@
+# Deliberately wrong: arm1 and arm3 both reach into the left rack at once.
+# The rack is a shared zone with capacity 1. With schedule: sequential the
+# steps run exactly as written, so the planner rejects this plan.
+product: week2_zone_conflict
+schedule: sequential   # the auto scheduler would quietly fix this by waiting
+steps:
+  - parallel:
+      - tool_change: {arm: arm1, tool: gripper_A}
+      - tool_change: {arm: arm3, tool: vacuum}

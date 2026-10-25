@@ -1,0 +1,62 @@
+# What an AI agent might write on its first try: the doweled bracket, but it
+# asks arm2 to fetch the pen. The pen lives in the left rack, which only arm1
+# and arm3 can reach. The planner rejects it before any servo moves; the agent
+# gives the marking job to arm3 and the result is doweled_bracket.yaml.
+product: ai_first_draft
+items:
+  plate: {at: kit.plate, kind: plate}
+  pin1:  {at: pin_cup, kind: pin}
+  pin2:  {at: pin_cup, kind: pin}
+steps:
+  - parallel:
+      - tool_change: {arm: arm3, tool: vacuum}
+      - tool_change: {arm: arm2, tool: clamp}
+    note: Tooling up - arm3 takes the vacuum cup, arm2 the clamp
+  - parallel:
+      - tool_change: {arm: arm1, tool: gripper_A}
+      - - tool_change: {arm: arm4, tool: spindle}
+        - bit_change: {arm: arm4, bit: ream_2_0}
+    note: arm1 takes a gripper; arm4 takes the spindle and loads the 2.0 mm reamer
+  - pick:  {arm: arm3, item: plate, from: kit.plate}
+    note: Loader lifts the plate from the kit tray
+  - place: {arm: arm3, to: fixture}
+    note: ...and seats it in the fixture
+  - hold: {arm: arm2, at: fixture.edge}
+    note: Clamp the plate
+  - machine: {arm: arm4, at: [fixture.hole1, fixture.hole2], depth: 5}
+    note: Ream both pilot holes to 2.0 mm
+  - bit_change: {arm: arm4, bit: csink_90}
+    note: Swap the reamer for the countersink
+  - machine: {arm: arm4, at: [fixture.hole1, fixture.hole2], depth: 0.8}
+    note: Chamfer both holes so the pins start straight
+  - release: {arm: arm2}
+    note: Clamp lets go - pressing pins pushes the plate into the fixture anyway
+  - parallel:
+      - tool_change: {arm: arm4, tool: none}
+      - pick: {arm: arm1, item: pin1, from: pin_cup}
+    note: Spindle goes home while arm1 fetches the first pin
+  - place: {arm: arm1, to: fixture.pin1, into: plate, press: 2}
+    note: Press pin 1 into the reamed hole
+  - pick:  {arm: arm1, item: pin2, from: pin_cup}
+  - place: {arm: arm1, to: fixture.pin2, into: plate, press: 2}
+    note: Press pin 2
+  - tool_change: {arm: arm3, tool: probe}
+    note: Loader swaps the vacuum cup for the touch probe
+  - probe: {arm: arm3, at: [fixture.pin1_top, fixture.pin2_top], expect: 9, tol: 0.3}
+    note: Measure both pin heights (9.0 +/- 0.3 mm)
+  - tool_change: {arm: arm2, tool: pen}
+    note: Probe out, pen in
+  - draw: {arm: arm2, at: fixture, path: [[-4, -10], [-4, -4], [3, -10], [3, -4]]}
+    note: Mark the part
+  - inspect: {at: fixture, check: pins_seated}
+    note: Overhead camera checks the finished part
+  - parallel:
+      - tool_change: {arm: arm3, tool: none}
+      - pick: {arm: arm1, item: plate, from: fixture}
+    note: Pen goes home while arm1 lifts the finished bracket
+  - place: {arm: arm1, to: finished}
+    note: Into the finished tray
+  - parallel:
+      - tool_change: {arm: arm1, tool: none}
+      - tool_change: {arm: arm2, tool: none}
+    note: Everyone returns their tools

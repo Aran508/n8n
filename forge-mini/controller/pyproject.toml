@@ -1,0 +1,18 @@
+[project]
+name = "forge-mini"
+version = "0.1.0"
+description = "Controller, planner and MCP server for the Forge Mini 4-arm micro-factory"
+requires-python = ">=3.10"
+dependencies = ["pyyaml>=6"]
+
+[project.optional-dependencies]
+hardware = ["pyserial>=3.5"]
+vision = ["opencv-contrib-python>=4.8", "numpy"]
+mcp = ["mcp>=1.2"]  # v1 (FastMCP) and v2 (MCPServer) both work
+dev = ["pytest"]
+
+[project.scripts]
+forge = "forge.cli:main"
+
+[tool.setuptools]
+packages = ["forge"]
