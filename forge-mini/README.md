@@ -18,6 +18,7 @@ A desktop micro-factory prototype: four small servo arms around one work plate. 
 
 | Path | What it is |
 |---|---|
+| `cad/` | Parametric CAD of the whole cell (text-to-cad): STEP with movable joints, and print-ready STL for every printed part. See `cad/README.md`. |
 | `sim/forge-mini-sim.html` | Interactive 3D simulation of the four-week build and the three projects. Open it in any browser. |
 | `docs/SMARTWATCH.md` | The ESP32-C3 perfboard smartwatch, step by step: what the cell does, what you do, design changes |
 | `docs/CAPABILITIES.md` | What it can make: computed accuracy, small assembly, soldering, underside work, the precision upgrade |

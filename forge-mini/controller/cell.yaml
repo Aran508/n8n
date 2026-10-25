@@ -88,7 +88,8 @@ motion:
 
 # Shared areas. At most `capacity` arms may be inside each at once. On top of
 # that, the planner keeps every pair of tools `clearance` mm apart (each tool is
-# a vertical segment from tip to coupler face; 20 mm = two coupler-plate radii),
+# a vertical segment from tip to coupler face; 20 mm is a little more than two
+# coupler-plate radii: the plates are 17.4 mm across to fit the 18 mm slot pitch),
 # checked every 50 ms of the plan.
 clearance: 20
 zones:
