@@ -1,0 +1,4 @@
+# Personal job-hunt files (resume, profile, applications) stay local, never pushed
+*
+!.gitignore
+!ROUTE.md
